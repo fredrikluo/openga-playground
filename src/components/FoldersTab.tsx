@@ -246,6 +246,8 @@ const FoldersTab = () => {
               onFolderClick={handleFolderClick}
               onBackClick={handleBackClick}
               viewType={viewType}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
 
             {currentFolderId && (
@@ -274,33 +276,6 @@ const FoldersTab = () => {
           </>
         )}
 
-        <div className="mt-8">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">All Folders (for editing/deleting)</h3>
-          <ul className="space-y-3">
-            {allFolders.map((folder) => (
-              <li
-                key={folder.id}
-                className="flex justify-between items-center p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition"
-              >
-                <p className="font-semibold text-gray-700">{folder.name}</p>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleEdit(folder)}
-                    className="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(folder.id)}
-                    className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
     </div>
   );
