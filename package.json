@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:init": "ts-node --project tsconfig.json src/lib/init-db.ts"
+    "db:init": "ts-node --project tsconfig.cjs.json src/lib/init-db.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",

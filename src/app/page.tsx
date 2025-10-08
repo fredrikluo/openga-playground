@@ -1,4 +1,5 @@
 import Tabs from '@/components/Tabs';
+import CurrentUserSelector from '@/components/CurrentUserSelector';
 
 export default function Home() {
   return (
@@ -11,6 +12,9 @@ export default function Home() {
           <p className="mt-2 text-lg text-gray-600">
             A simple interface to manage your Kahoots and related entities.
           </p>
+        </div>
+        <div className="mb-8">
+          <CurrentUserSelector />
         </div>
         <div className="bg-white rounded-lg shadow-xl">
           <Tabs />
