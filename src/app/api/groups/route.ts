@@ -1,8 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import db from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const organizationId = searchParams.get('organizationId');
+
+    if (organizationId) {
+      const groups = db.prepare('SELECT * FROM groups WHERE organization_id = ?').all(organizationId);
+      return NextResponse.json(groups);
+    }
+
     const groups = db.prepare('SELECT * FROM groups').all();
     return NextResponse.json(groups);
   } catch (error) {

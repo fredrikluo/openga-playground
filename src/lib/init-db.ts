@@ -53,11 +53,38 @@ function initDb() {
       folder_id INTEGER NOT NULL,
       FOREIGN KEY (folder_id) REFERENCES folders(id)
     );
-
-    ALTER TABLE organizations ADD FOREIGN KEY (root_folder_id) REFERENCES folders(id);
   `);
 
   console.log('Database initialized successfully.');
+
+  // Create a default organization and user
+  try {
+    const orgStmt = db.prepare(`
+      INSERT INTO organizations (name) VALUES (?)
+    `);
+    const orgInfo = orgStmt.run('Default Organization');
+    const orgId = orgInfo.lastInsertRowid;
+
+    const folderStmt = db.prepare('INSERT INTO folders (name, organization_id) VALUES (?, ?)');
+    const folderInfo = folderStmt.run('Default Root Folder', orgId);
+    const rootFolderId = folderInfo.lastInsertRowid;
+
+    const updateOrgStmt = db.prepare('UPDATE organizations SET root_folder_id = ? WHERE id = ?');
+    updateOrgStmt.run(rootFolderId, orgId);
+
+    const userStmt = db.prepare(`
+      INSERT INTO users (name, email, organization_id) VALUES (?, ?, ?)
+    `);
+    userStmt.run('Default User', 'user@example.com', orgId);
+
+    console.log('Default data created successfully.');
+  } catch (e) {
+    const error = e as { code?: string };
+    // Ignore if data already exists
+    if (error.code !== 'SQLITE_CONSTRAINT_UNIQUE') {
+      console.error('Failed to create default data:', e);
+    }
+  }
 }
 
 try {
