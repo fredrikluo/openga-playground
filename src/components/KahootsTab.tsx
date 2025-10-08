@@ -77,6 +77,11 @@ const KahootsTab = () => {
     setFolderId('');
   };
 
+  const getFolderName = (folderId: number) => {
+    const folder = folders.find((f) => f.id === folderId);
+    return folder ? folder.name : '...';
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -115,7 +120,10 @@ const KahootsTab = () => {
         <ul className="space-y-3">
           {kahoots.map((kahoot) => (
             <li key={kahoot.id} className="flex justify-between items-center p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition">
-              <p className="font-semibold text-gray-700">{kahoot.name}</p>
+              <div>
+                <p className="font-semibold text-gray-700">{kahoot.name}</p>
+                <p className="text-sm text-gray-500">Folder: {getFolderName(kahoot.folder_id)}</p>
+              </div>
               <div className="flex space-x-2">
                 <button onClick={() => handleEdit(kahoot)} className="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition">Edit</button>
                 <button onClick={() => handleDelete(kahoot.id)} className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Delete</button>
