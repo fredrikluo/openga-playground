@@ -35,7 +35,7 @@ const GroupsTab = () => {
 
   useEffect(() => {
     fetchGroups();
-  }, [currentUser]);
+  }, [currentUser, currentUser?.organization_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

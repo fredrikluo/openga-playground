@@ -13,13 +13,33 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name, email } = await request.json();
+    const { name, email, organizationId, newOrganization } = await request.json();
     if (!name || !email) {
       return NextResponse.json({ message: 'Name and email are required' }, { status: 400 });
     }
-    const stmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
-    const info = stmt.run(name, email);
-    return NextResponse.json({ id: info.lastInsertRowid, name, email }, { status: 201 });
+
+    let orgId = organizationId;
+
+    if (newOrganization) {
+      const orgTransaction = db.transaction(() => {
+        const folderStmt = db.prepare('INSERT INTO folders (name) VALUES (?)');
+        const folderInfo = folderStmt.run(`${newOrganization} Root Folder`);
+        const rootFolderId = folderInfo.lastInsertRowid;
+
+        const orgStmt = db.prepare('INSERT INTO organizations (name, root_folder_id) VALUES (?, ?)');
+        const orgInfo = orgStmt.run(newOrganization, rootFolderId);
+        return orgInfo.lastInsertRowid as number;
+      });
+      orgId = orgTransaction();
+    }
+
+    if (!orgId) {
+      return NextResponse.json({ message: 'Organization is required' }, { status: 400 });
+    }
+
+    const stmt = db.prepare('INSERT INTO users (name, email, organization_id) VALUES (?, ?, ?)');
+    const info = stmt.run(name, email, orgId);
+    return NextResponse.json({ id: info.lastInsertRowid, name, email, organization_id: orgId }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
