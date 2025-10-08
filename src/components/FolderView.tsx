@@ -1,6 +1,6 @@
 'use client';
 
-import { Folder, FileText, ArrowLeft } from 'lucide-react';
+import { Folder, FileText, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 
 interface Kahoot {
   id: number;
@@ -10,6 +10,7 @@ interface Kahoot {
 interface SubFolder {
   id: number;
   name: string;
+  parent_folder_id: number | null;
 }
 
 interface FolderViewProps {
@@ -19,6 +20,8 @@ interface FolderViewProps {
   onFolderClick: (folderId: number) => void;
   onBackClick: () => void;
   viewType: 'grid' | 'list';
+  onEdit: (folder: SubFolder) => void;
+  onDelete: (folderId: number) => void;
 }
 
 export default function FolderView({
@@ -28,9 +31,11 @@ export default function FolderView({
   onFolderClick,
   onBackClick,
   viewType,
+  onEdit,
+  onDelete,
 }: FolderViewProps) {
   return (
-    <div>
+    <div className="min-h-[300px] overflow-y-auto">
       <div className="flex items-center mb-4">
         {currentFolder && (
           <button
@@ -49,11 +54,27 @@ export default function FolderView({
           {folders.map((folder) => (
             <div
               key={`folder-${folder.id}`}
-              className="flex flex-col items-center justify-center p-4 rounded-xl cursor-pointer bg-white shadow-md hover:shadow-lg hover:bg-gray-50 transition-all"
+              className="relative flex flex-col items-center justify-center p-4 rounded-xl cursor-pointer bg-white shadow-md hover:shadow-lg hover:bg-gray-50 transition-all"
               onClick={() => onFolderClick(folder.id)}
             >
               <Folder size={52} className="text-blue-500" />
               <span className="mt-3 text-md font-medium text-center text-gray-700">{folder.name}</span>
+              <div className="absolute top-1 right-1 flex">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit(folder); }}
+                  className="p-1 rounded-full hover:bg-gray-200"
+                  aria-label={`Edit folder ${folder.name}`}
+                >
+                  <Pencil size={16} className="text-gray-600" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(folder.id); }}
+                  className="p-1 rounded-full hover:bg-gray-200"
+                  aria-label={`Delete folder ${folder.name}`}
+                >
+                  <Trash2 size={16} className="text-gray-600" />
+                </button>
+              </div>
             </div>
           ))}
           {kahoots.map((kahoot) => (
@@ -75,7 +96,23 @@ export default function FolderView({
               onClick={() => onFolderClick(folder.id)}
             >
               <Folder size={24} className="mr-4 text-blue-500" />
-              <span className="text-lg font-medium text-gray-800">{folder.name}</span>
+              <span className="text-lg font-medium text-gray-800 flex-grow">{folder.name}</span>
+              <div className="flex space-x-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit(folder); }}
+                  className="p-2 rounded-full hover:bg-gray-200"
+                   aria-label={`Edit folder ${folder.name}`}
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(folder.id); }}
+                  className="p-2 rounded-full hover:bg-gray-200"
+                   aria-label={`Delete folder ${folder.name}`}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </li>
           ))}
           {kahoots.map((kahoot) => (

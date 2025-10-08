@@ -6,51 +6,23 @@ def run(playwright):
     page = context.new_page()
 
     try:
-        page.goto("http://localhost:3000", timeout=60000)
+        # Navigate to the application
+        page.goto("http://localhost:3000")
 
-        # Wait for the main content to be present, indicating the page has loaded.
-        page.wait_for_selector("main", timeout=60000)
+        # Click on the "Folders" tab
+        page.get_by_role("button", name="Folders").click()
 
-        # Click on the Folders tab, with a longer timeout
-        folders_tab = page.get_by_role("tab", name="Folders")
-        expect(folders_tab).to_be_visible(timeout=60000)
-        folders_tab.click()
+        # Wait for the folder view to be visible
+        expect(page.locator("text=Home")).to_be_visible()
 
-        # Take a screenshot of the initial folder view
-        page.screenshot(path="jules-scratch/verification/01_initial_view.png")
+        # Check that the "All Folders" list is not present
+        all_folders_heading = page.locator("text=All Folders (for editing/deleting)")
+        expect(all_folders_heading).not_to_be_visible()
 
-        # Create a new folder
-        page.get_by_placeholder("Folder Name").fill("Test Folder")
-        page.get_by_role("button", name="Add").click()
+        # Take a screenshot
+        page.screenshot(path="jules-scratch/verification/verification.png")
 
-        # Wait for the new folder to appear in the main view and take a screenshot
-        # We use .first() because the folder name will also appear in the "All Folders" list
-        new_folder_in_view = page.get_by_text("Test Folder").first
-        expect(new_folder_in_view).to_be_visible()
-        page.screenshot(path="jules-scratch/verification/02_folder_created.png")
-
-        # Click on the new folder to navigate into it
-        new_folder_in_view.click()
-
-        # Take a screenshot inside the new folder
-        expect(page.get_by_role("heading", name="Test Folder")).to_be_visible()
-        page.screenshot(path="jules-scratch/verification/03_inside_folder.png")
-
-        # Go back to the parent folder
-        page.get_by_label("Go back").click()
-
-        # Take a screenshot of the view after going back
-        expect(page.get_by_role("heading", name="Home")).to_be_visible()
-        page.screenshot(path="jules-scratch/verification/04_after_back.png")
-
-    except Exception as e:
-        print(f"Playwright script failed: {e}")
-        page.screenshot(path="jules-scratch/verification/failure_screenshot.png")
-        with open("jules-scratch/verification/failure_page_source.html", "w") as f:
-            f.write(page.content())
-        raise # re-raise the exception after saving the state
     finally:
-        context.close()
         browser.close()
 
 with sync_playwright() as playwright:
