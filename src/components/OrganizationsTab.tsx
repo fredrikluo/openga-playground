@@ -13,7 +13,8 @@ const OrganizationsTab = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [name, setName] = useState('');
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
-  const { currentUser } = useUser();
+  const { currentUser, refetchUsers } = useUser();
+  const [newOrganizationName, setNewOrganizationName] = useState('');
 
   const fetchOrganizations = async () => {
     if (currentUser) {
@@ -29,7 +30,7 @@ const OrganizationsTab = () => {
     fetchOrganizations();
   }, [currentUser]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingOrg) {
       await fetch(`/api/organizations/${editingOrg.id}`, {
@@ -39,6 +40,20 @@ const OrganizationsTab = () => {
       });
       resetForm();
       fetchOrganizations();
+    }
+  };
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentUser) {
+      await fetch('/api/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newOrganizationName, userId: currentUser.id }),
+      });
+      setNewOrganizationName('');
+      fetchOrganizations();
+      refetchUsers();
     }
   };
 
@@ -64,7 +79,7 @@ const OrganizationsTab = () => {
       {editingOrg && (
         <div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Edit Organization</h2>
-          <form onSubmit={handleSubmit} className="p-4 bg-gray-50 rounded-lg shadow-sm space-y-4">
+          <form onSubmit={handleUpdateSubmit} className="p-4 bg-gray-50 rounded-lg shadow-sm space-y-4">
             <input
               type="text"
               placeholder="Organization Name"
@@ -97,7 +112,22 @@ const OrganizationsTab = () => {
               ))}
             </ul>
           ) : (
-            <p className="text-gray-500">No organization associated with this user.</p>
+            <div>
+              <p className="text-gray-500 mb-4">No organization associated with this user. Create one below.</p>
+              <form onSubmit={handleCreateSubmit} className="p-4 bg-gray-50 rounded-lg shadow-sm space-y-4">
+                <input
+                  type="text"
+                  placeholder="New Organization Name"
+                  value={newOrganizationName}
+                  onChange={(e) => setNewOrganizationName(e.target.value)}
+                  className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  required
+                />
+                <div className="flex justify-end">
+                  <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">Create Organization</button>
+                </div>
+              </form>
+            </div>
           )
         ) : (
           <p className="text-gray-500">Please select a user to view their organization.</p>

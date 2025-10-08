@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 
 interface User {
   id: number;
@@ -13,6 +13,7 @@ interface UserContextType {
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
   users: User[];
+  refetchUsers: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -21,24 +22,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const res = await fetch('/api/users');
-        if (!res.ok) {
-          throw new Error('Failed to fetch users');
-        }
-        const data = await res.json();
-        setUsers(data);
-      } catch (error) {
-        console.error(error);
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (!res.ok) {
+        throw new Error('Failed to fetch users');
       }
-    };
-    fetchUsers();
+      const data = await res.json();
+      setUsers(data);
+    } catch (error) {
+      console.error(error);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
   return (
-    <UserContext.Provider value={{ currentUser, setCurrentUser, users }}>
+    <UserContext.Provider value={{ currentUser, setCurrentUser, users, refetchUsers: fetchUsers }}>
       {children}
     </UserContext.Provider>
   );
