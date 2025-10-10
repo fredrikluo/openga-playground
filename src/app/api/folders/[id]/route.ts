@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
+import type { Folder, Kahoot } from '@/lib/schema';
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
     const { id } = params;
-    const folder = db.prepare('SELECT * FROM folders WHERE id = ?').get(id);
+    const folder = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Folder;
     if (!folder) {
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
     }
-    const subfolders = db.prepare('SELECT * FROM folders WHERE parent_folder_id = ?').all(id);
-    const kahoots = db.prepare('SELECT * FROM kahoots WHERE folder_id = ?').all(id);
+    const subfolders = db.prepare('SELECT * FROM folders WHERE parent_folder_id = ?').all(id) as Folder[];
+    const kahoots = db.prepare('SELECT * FROM kahoots WHERE folder_id = ?').all(id) as Kahoot[];
     return NextResponse.json({ ...folder, subfolders, kahoots });
   } catch (error) {
     console.error(error);
@@ -40,8 +41,8 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   try {
     const { id } = params;
 
-    const deleteFolderAndContents = (folderId: number | bigint) => {
-      const subfolders = db.prepare('SELECT id FROM folders WHERE parent_folder_id = ?').all(folderId);
+    const deleteFolderAndContents = (folderId: number) => {
+      const subfolders = db.prepare('SELECT id FROM folders WHERE parent_folder_id = ?').all(folderId) as Pick<Folder, 'id'>[];
       for (const subfolder of subfolders) {
         deleteFolderAndContents(subfolder.id);
       }
@@ -51,7 +52,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     };
 
     const transaction = db.transaction(() => {
-      const folder = db.prepare('SELECT id FROM folders WHERE id = ?').get(id);
+      const folder = db.prepare('SELECT id FROM folders WHERE id = ?').get(id) as Pick<Folder, 'id'> | undefined;
       if (!folder) {
         return { changes: 0 };
       }
