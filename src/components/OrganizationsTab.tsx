@@ -23,6 +23,15 @@ const OrganizationsTab = () => {
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
   const { currentUser, refetchUsers } = useUser();
   const [newOrganizationName, setNewOrganizationName] = useState('');
+  const [unassignedUsers, setUnassignedUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<string>('');
+  const [addingMemberToOrg, setAddingMemberToOrg] = useState<number | null>(null);
+
+  const fetchUnassignedUsers = async () => {
+    const res = await fetch('/api/users?unassigned=true');
+    const data = await res.json();
+    setUnassignedUsers(data);
+  };
 
   const fetchOrganizations = async () => {
     if (currentUser) {
@@ -48,6 +57,7 @@ const OrganizationsTab = () => {
 
   useEffect(() => {
     fetchOrganizations();
+    fetchUnassignedUsers();
   }, [currentUser]);
 
   const handleUpdateSubmit = async (e: React.FormEvent) => {
@@ -104,6 +114,34 @@ const OrganizationsTab = () => {
     setName('');
   };
 
+  const handleAddMember = async (organizationId: number) => {
+    if (!selectedUser || !currentUser) return;
+
+    await fetch(`/api/users/${selectedUser}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organization_id: organizationId, currentUserId: currentUser.id }),
+    });
+
+    fetchUsers(organizationId);
+    fetchUnassignedUsers();
+    setSelectedUser('');
+    setAddingMemberToOrg(null);
+  };
+
+  const handleRemoveMember = async (userId: number, organizationId: number) => {
+    if (!currentUser) return;
+
+    await fetch(`/api/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organization_id: null, currentUserId: currentUser.id }),
+    });
+
+    fetchUsers(organizationId);
+    fetchUnassignedUsers();
+  };
+
   return (
     <div className="space-y-6">
       {editingOrg && (
@@ -148,19 +186,52 @@ const OrganizationsTab = () => {
                           <p className="font-semibold text-gray-700">{user.name}</p>
                           <p className="text-sm text-gray-500">{user.email}</p>
                         </div>
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleChange(user.id, e.target.value, org.id)}
-                          className="border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="coadmin">Coadmin</option>
-                          <option value="member">Member</option>
-                          <option value="limited member">Limited Member</option>
-                        </select>
+                        <div className="flex items-center space-x-2">
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleRoleChange(user.id, e.target.value, org.id)}
+                            className="border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="coadmin">Coadmin</option>
+                            <option value="member">Member</option>
+                            <option value="limited member">Limited Member</option>
+                          </select>
+                          <button onClick={() => handleRemoveMember(user.id, org.id)} className="px-3 py-1 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition">
+                            Remove
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
+                  <div className="mt-4">
+                    {addingMemberToOrg === org.id ? (
+                      <div className="flex items-center space-x-2">
+                        <select
+                          value={selectedUser}
+                          onChange={(e) => setSelectedUser(e.target.value)}
+                          className="border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                        >
+                          <option value="">Select a user</option>
+                          {unassignedUsers.map((user) => (
+                            <option key={user.id} value={user.id}>
+                              {user.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button onClick={() => handleAddMember(org.id)} className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition">
+                          Add
+                        </button>
+                        <button onClick={() => setAddingMemberToOrg(null)} className="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition">
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setAddingMemberToOrg(org.id)} className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition">
+                        Add Member
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
