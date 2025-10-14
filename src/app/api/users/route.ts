@@ -1,8 +1,27 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import db from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const organizationId = searchParams.get('organizationId');
+    const currentUserId = searchParams.get('currentUserId');
+
+    if (organizationId) {
+      if (!currentUserId) {
+        return NextResponse.json({ message: 'currentUserId is required' }, { status: 400 });
+      }
+
+      const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(currentUserId);
+
+      if (!currentUser || currentUser.organization_id !== parseInt(organizationId, 10)) {
+        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+      }
+
+      const users = db.prepare('SELECT * FROM users WHERE organization_id = ?').all(organizationId);
+      return NextResponse.json(users);
+    }
+
     const users = db.prepare('SELECT * FROM users').all();
     return NextResponse.json(users);
   } catch (error) {
