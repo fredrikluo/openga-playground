@@ -14,7 +14,7 @@ const CurrentUserSelector = () => {
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
       <label htmlFor="user-selector" className="block text-lg font-medium text-gray-700 mb-2">
-        Current User
+        Login As:
       </label>
       <select
         id="user-selector"

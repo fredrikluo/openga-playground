@@ -7,11 +7,8 @@ export default function Home() {
       <div className="w-full max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-extrabold text-gray-800 tracking-tight">
-            Kahoot Manager
+            Kahoot Permission Emulator
           </h1>
-          <p className="mt-2 text-lg text-gray-600">
-            A simple interface to manage your Kahoots and related entities.
-          </p>
         </div>
         <div className="mb-8">
           <CurrentUserSelector />
