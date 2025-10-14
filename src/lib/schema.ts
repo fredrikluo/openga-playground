@@ -4,11 +4,14 @@ export interface Organization {
   root_folder_id: number;
 }
 
+export type UserRole = 'admin' | 'coadmin' | 'member' | 'limited member';
+
 export interface User {
   id: number;
   name: string;
   email: string;
   organization_id: number;
+  role: UserRole;
 }
 
 export interface Group {

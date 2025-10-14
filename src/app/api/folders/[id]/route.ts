@@ -41,7 +41,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   try {
     const { id } = params;
 
-    const deleteFolderAndContents = (folderId: number) => {
+    const deleteFolderAndContents = (folderId: number | bigint) => {
       const subfolders = db.prepare('SELECT id FROM folders WHERE parent_folder_id = ?').all(folderId) as Pick<Folder, 'id'>[];
       for (const subfolder of subfolders) {
         deleteFolderAndContents(subfolder.id);

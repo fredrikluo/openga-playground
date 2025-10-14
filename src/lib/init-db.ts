@@ -20,6 +20,7 @@ function initDb() {
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       organization_id INTEGER,
+      role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('admin', 'coadmin', 'member', 'limited member')),
       FOREIGN KEY (organization_id) REFERENCES organizations(id)
     );
 
@@ -73,9 +74,9 @@ function initDb() {
     updateOrgStmt.run(rootFolderId, orgId);
 
     const userStmt = db.prepare(`
-      INSERT INTO users (name, email, organization_id) VALUES (?, ?, ?)
+      INSERT INTO users (name, email, organization_id, role) VALUES (?, ?, ?, ?)
     `);
-    userStmt.run('Default User', 'user@example.com', orgId);
+    userStmt.run('Default User', 'user@example.com', orgId, 'admin');
 
     console.log('Default data created successfully.');
   } catch (e) {
