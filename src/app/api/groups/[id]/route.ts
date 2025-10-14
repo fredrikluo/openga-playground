@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
     if (!group) {
       return NextResponse.json({ message: 'Group not found' }, { status: 404 });
@@ -16,9 +16,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const { name, user_ids } = await request.json();
     if (!name) {
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
@@ -56,9 +56,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
 
     const transaction = db.transaction(() => {
       const deleteUsersStmt = db.prepare('DELETE FROM group_users WHERE group_id = ?');
