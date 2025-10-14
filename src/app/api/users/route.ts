@@ -6,6 +6,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const organizationId = searchParams.get('organizationId');
     const currentUserId = searchParams.get('currentUserId');
+    const unassigned = searchParams.get('unassigned');
+
+    if (unassigned === 'true') {
+      const users = db.prepare('SELECT * FROM users WHERE organization_id IS NULL').all();
+      return NextResponse.json(users);
+    }
 
     if (organizationId) {
       if (!currentUserId) {
