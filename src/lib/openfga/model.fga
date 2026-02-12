@@ -25,38 +25,33 @@ type folder
     define in_org: [organization]
 
     # Direct role assignments on THIS folder
-    define owner:   [user, group#member]
     define manager: [user, group#member]
     define editor:  [user, group#member]
     define creator: [user, group#member]  # NOTE: NOT inherited
     define viewer:  [user, group#member]
 
-    # Personal top folder
-    define personal_owner: [user]
-
     # Inherited roles (creator is intentionally NOT inherited)
-    define owner_inherited:   (owner or personal_owner) or parent->owner_inherited
     define manager_inherited: manager or parent->manager_inherited
     define editor_inherited:  editor  or parent->editor_inherited
     define viewer_inherited:  viewer  or parent->viewer_inherited
 
     # --- Permissions to match your table ---
 
-    # View: Owner/Manager/Editor/Creator/Viewer
-    define can_view: owner_inherited or manager_inherited or editor_inherited or creator or viewer_inherited
+    # View: Manager/Editor/Creator/Viewer
+    define can_view: manager_inherited or editor_inherited or creator or viewer_inherited
 
-    # Create: Owner/Manager/Editor/Creator (but not Viewer)
+    # Create: Manager/Editor/Creator (but not Viewer)
     # Creator is direct-only on this folder (not inherited)
-    define can_create: owner_inherited or manager_inherited or editor_inherited or creator
+    define can_create: manager_inherited or editor_inherited or creator
 
-    # Edit + Duplicate: Owner/Manager/Editor
-    define can_edit: owner_inherited or manager_inherited or editor_inherited
+    # Edit + Duplicate: Manager/Editor
+    define can_edit: manager_inherited or editor_inherited
     define can_duplicate: can_edit
 
-    # Remove + Set visibility + Lock/Unlock: Owner/Manager
-    define can_remove: owner_inherited or manager_inherited
-    define can_set_visibility: owner_inherited or manager_inherited
-    define can_lock: owner_inherited or manager_inherited
+    # Remove + Set visibility + Lock/Unlock: Manager
+    define can_remove: manager_inherited
+    define can_set_visibility: manager_inherited
+    define can_lock: manager_inherited
 
     # Effective permissions: must also be an org member
     define can_view_effective:          can_view          and in_org->member
@@ -76,7 +71,6 @@ type document
     define in_org: [organization]
 
     # Direct role assignments on THIS document (exceptions)
-    define owner:   [user, group#member]
     define manager: [user, group#member]
     define editor:  [user, group#member]
     define creator: [user, group#member]  # NOTE: NOT inherited
@@ -87,7 +81,6 @@ type document
 
     # Inherit roles from parent folder + allow doc-local overrides
     # (creator is intentionally NOT inherited)
-    define owner_inherited:   owner   or parent->owner_inherited
     define manager_inherited: manager or parent->manager_inherited
     define editor_inherited:  editor  or parent->editor_inherited
     define viewer_inherited:  viewer  or parent->viewer_inherited
@@ -95,20 +88,20 @@ type document
     # --- Permissions to match your table ---
 
     # View: all roles + shared_with (still org-gated)
-    define can_view: owner_inherited or manager_inherited or editor_inherited or creator or viewer_inherited or shared_with
+    define can_view: manager_inherited or editor_inherited or creator or viewer_inherited or shared_with
 
-    # Create: Owner/Manager/Editor/Creator (Viewer can't)
+    # Create: Manager/Editor/Creator (Viewer can't)
     # (Often "create" is checked on the *folder*, but included here for completeness)
-    define can_create: owner_inherited or manager_inherited or editor_inherited or creator
+    define can_create: manager_inherited or editor_inherited or creator
 
-    # Edit + Duplicate: Owner/Manager/Editor
-    define can_edit: owner_inherited or manager_inherited or editor_inherited
+    # Edit + Duplicate: Manager/Editor
+    define can_edit: manager_inherited or editor_inherited
     define can_duplicate: can_edit
 
-    # Remove + Set visibility + Lock/Unlock: Owner/Manager
-    define can_remove: owner_inherited or manager_inherited
-    define can_set_visibility: owner_inherited or manager_inherited
-    define can_lock: owner_inherited or manager_inherited
+    # Remove + Set visibility + Lock/Unlock: Manager
+    define can_remove: manager_inherited
+    define can_set_visibility: manager_inherited
+    define can_lock: manager_inherited
 
     # Effective permissions: must also be an org member
     define can_view_effective:           can_view           and in_org->member
