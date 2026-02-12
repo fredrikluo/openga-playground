@@ -1,0 +1,113 @@
+model
+  schema 1.1
+
+type user
+
+type organization
+  relations
+    # Org membership is the global “kill switch”
+    define member: [user]
+
+    define top_folder: [folder]
+
+type group
+  relations
+    define in_org: [organization]
+    define member: [user]
+    define top_folder: [folder]
+
+type folder
+  relations
+    # Folder hierarchy
+    define parent: [folder]
+
+    # Folder belongs to an org (for membership gating)
+    define in_org: [organization]
+
+    # Direct role assignments on THIS folder
+    define manager: [user, group#member]
+    define editor:  [user, group#member]
+    define creator: [user, group#member]  # NOTE: NOT inherited
+    define viewer:  [user, group#member]
+
+    # Inherited roles (creator is intentionally NOT inherited)
+    define manager_inherited: manager or parent->manager_inherited
+    define editor_inherited:  editor  or parent->editor_inherited
+    define viewer_inherited:  viewer  or parent->viewer_inherited
+
+    # --- Permissions to match your table ---
+
+    # View: Manager/Editor/Creator/Viewer
+    define can_view: manager_inherited or editor_inherited or creator or viewer_inherited
+
+    # Create: Manager/Editor/Creator (but not Viewer)
+    # Creator is direct-only on this folder (not inherited)
+    define can_create: manager_inherited or editor_inherited or creator
+
+    # Edit + Duplicate: Manager/Editor
+    define can_edit: manager_inherited or editor_inherited
+    define can_duplicate: can_edit
+
+    # Remove + Set visibility + Lock/Unlock: Manager
+    define can_remove: manager_inherited
+    define can_set_visibility: manager_inherited
+    define can_lock: manager_inherited
+
+    # Effective permissions: must also be an org member
+    define can_view_effective:          can_view          and in_org->member
+    define can_create_effective:        can_create        and in_org->member
+    define can_edit_effective:          can_edit          and in_org->member
+    define can_duplicate_effective:     can_duplicate     and in_org->member
+    define can_remove_effective:        can_remove        and in_org->member
+    define can_set_visibility_effective: can_set_visibility and in_org->member
+    define can_lock_effective:          can_lock          and in_org->member
+
+type document
+  relations
+    # Document is contained in a folder
+    define parent: [folder]
+
+    # Document belongs to an org (for membership gating)
+    define in_org: [organization]
+
+    # Direct role assignments on THIS document (exceptions)
+    define manager: [user, group#member]
+    define editor:  [user, group#member]
+    define creator: [user, group#member]  # NOTE: NOT inherited
+    define viewer:  [user, group#member]
+
+    # Direct share to a specific user
+    define shared_with: [user]
+
+    # Inherit roles from parent folder + allow doc-local overrides
+    # (creator is intentionally NOT inherited)
+    define manager_inherited: manager or parent->manager_inherited
+    define editor_inherited:  editor  or parent->editor_inherited
+    define viewer_inherited:  viewer  or parent->viewer_inherited
+
+    # --- Permissions to match your table ---
+
+    # View: all roles + shared_with (still org-gated)
+    define can_view: manager_inherited or editor_inherited or creator or viewer_inherited or shared_with
+
+    # Create: Manager/Editor/Creator (Viewer can't)
+    # (Often "create" is checked on the *folder*, but included here for completeness)
+    define can_create: manager_inherited or editor_inherited or creator
+
+    # Edit + Duplicate: Manager/Editor
+    define can_edit: manager_inherited or editor_inherited
+    define can_duplicate: can_edit
+
+    # Remove + Set visibility + Lock/Unlock: Manager
+    define can_remove: manager_inherited
+    define can_set_visibility: manager_inherited
+    define can_lock: manager_inherited
+
+    # Effective permissions: must also be an org member
+    define can_view_effective:           can_view           and in_org->member
+    define can_create_effective:         can_create         and in_org->member
+    define can_edit_effective:           can_edit           and in_org->member
+    define can_duplicate_effective:      can_duplicate      and in_org->member
+    define can_remove_effective:         can_remove         and in_org->member
+    define can_set_visibility_effective: can_set_visibility and in_org->member
+    define can_lock_effective:           can_lock           and in_org->member
