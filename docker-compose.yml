@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - OPENFGA_API_URL=http://openfga:8080
+    depends_on:
+      - openfga
+    networks:
+      - app-network
+    volumes:
+      # Mount the SQLite database directory for persistence
+      - ./data:/app/data
+
+  openfga:
+    image: openfga/openfga:latest
+    ports:
+      - "8080:8080"
+      - "8081:8081"  # gRPC port
+      - "3001:3001"  # playground port
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=sqlite
+      - OPENFGA_DATASTORE_URI=file:/data/openfga.db
+      - OPENFGA_LOG_LEVEL=info
+      - OPENFGA_PLAYGROUND_ENABLED=true
+      - OPENFGA_PLAYGROUND_PORT=3001
+      - OPENFGA_HTTP_ADDR=0.0.0.0:8080
+      - OPENFGA_GRPC_ADDR=0.0.0.0:8081
+    volumes:
+      # Persist OpenFGA data
+      - ./data/openfga:/data
+      # Mount the authorization model for easy access
+      - ./src/lib/openfga:/models
+    networks:
+      - app-network
+    command: >
+      sh -c "
+        echo 'Starting OpenFGA server...' &&
+        /openfga run
+      "
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  app-data:
+  openfga-data:
