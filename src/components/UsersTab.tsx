@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useUser } from '@/context/UserContext';
 
 interface User {
   id: number;
@@ -14,6 +15,7 @@ interface Organization {
 }
 
 const UsersTab = () => {
+  const { refetchUsers } = useUser();
   const [users, setUsers] = useState<User[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -56,6 +58,7 @@ const UsersTab = () => {
     }
     resetForm();
     fetchUsers();
+    refetchUsers();
   };
 
   const handleEdit = (user: User) => {
@@ -69,6 +72,7 @@ const UsersTab = () => {
       method: 'DELETE',
     });
     fetchUsers();
+    refetchUsers();
   };
 
   const resetForm = () => {
