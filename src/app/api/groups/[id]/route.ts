@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { getOne, getAll } from '@/lib/db';
+import type { Group, User } from '@/lib/schema';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+    const group = getOne<Group>('SELECT * FROM groups WHERE id = ?', id);
     if (!group) {
       return NextResponse.json({ message: 'Group not found' }, { status: 404 });
     }
-    const users = db.prepare('SELECT u.* FROM users u JOIN group_users gu ON u.id = gu.user_id WHERE gu.group_id = ?').all(id);
+    const users = getAll<User>('SELECT u.* FROM users u JOIN group_users gu ON u.id = gu.user_id WHERE gu.group_id = ?', id);
     return NextResponse.json({ ...group, users });
   } catch (error) {
     console.error(error);

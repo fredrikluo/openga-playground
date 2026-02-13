@@ -23,6 +23,7 @@ const UsersTab = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationId, setOrganizationId] = useState<number | ''>('');
   const [newOrganization, setNewOrganization] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -43,21 +44,29 @@ const UsersTab = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    let res: Response;
     if (editingUser) {
-      await fetch(`/api/users/${editingUser.id}`, {
+      res = await fetch(`/api/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email }),
       });
     } else {
-      await fetch('/api/users', {
+      res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, organizationId, newOrganization }),
       });
     }
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.message || 'Something went wrong');
+      return;
+    }
     resetForm();
     fetchUsers();
+    fetchOrganizations();
     refetchUsers();
   };
 
@@ -88,6 +97,11 @@ const UsersTab = () => {
       <div>
         <h2 className="text-2xl font-bold text-gray-800 mb-4">{editingUser ? 'Edit User' : 'Add a New User'}</h2>
         <form onSubmit={handleSubmit} className="p-4 bg-gray-50 rounded-lg shadow-sm space-y-4">
+          {error && (
+            <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+              {error}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="text"

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { getOne } from '@/lib/db';
+import type { Kahoot } from '@/lib/schema';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
-    const kahoot = db.prepare('SELECT * FROM kahoots WHERE id = ?').get(id);
+    const { id } = await context.params;
+    const kahoot = getOne<Kahoot>('SELECT * FROM kahoots WHERE id = ?', id);
     if (!kahoot) {
       return NextResponse.json({ message: 'Kahoot not found' }, { status: 404 });
     }
@@ -15,9 +16,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const { name, folder_id } = await request.json();
     if (!name || !folder_id) {
       return NextResponse.json({ message: 'Name and folder_id are required' }, { status: 400 });
@@ -34,9 +35,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const stmt = db.prepare('DELETE FROM kahoots WHERE id = ?');
     const info = stmt.run(id);
     if (info.changes === 0) {

@@ -9,6 +9,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - DATABASE_PATH=/app/data/kahoot.db
       - OPENFGA_API_URL=http://openfga:8080
     depends_on:
       - openfga
@@ -36,14 +37,10 @@ services:
       # Persist OpenFGA data
       - ./data/openfga:/data
       # Mount the authorization model for easy access
-      - ./src/lib/openfga:/models
+      - ./openfga:/models
     networks:
       - app-network
-    command: >
-      sh -c "
-        echo 'Starting OpenFGA server...' &&
-        /openfga run
-      "
+    command: run
 
 networks:
   app-network:

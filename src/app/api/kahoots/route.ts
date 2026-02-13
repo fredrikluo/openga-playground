@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { getAll } from '@/lib/db';
+import type { Kahoot } from '@/lib/schema';
 
 export async function GET() {
   try {
-    const kahoots = db.prepare('SELECT * FROM kahoots').all();
+    const kahoots = getAll<Kahoot>('SELECT * FROM kahoots');
     return NextResponse.json(kahoots);
   } catch (error) {
     console.error(error);

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { getOne } from '@/lib/db';
+import type { Organization } from '@/lib/schema';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
-    const organization = db.prepare('SELECT * FROM organizations WHERE id = ?').get(id);
+    const { id } = await context.params;
+    const organization = getOne<Organization>('SELECT * FROM organizations WHERE id = ?', id);
     if (!organization) {
       return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
     }
@@ -15,9 +16,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const { name } = await request.json();
     if (!name) {
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
@@ -34,12 +35,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
 
     const transaction = db.transaction(() => {
-      const org = db.prepare('SELECT root_folder_id FROM organizations WHERE id = ?').get(id);
+      const org = getOne<Organization>('SELECT root_folder_id FROM organizations WHERE id = ?', id);
       if (!org) {
         return { changes: 0 };
       }

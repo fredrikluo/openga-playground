@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db from '@/lib/db';
+import db, { getOne, getAll } from '@/lib/db';
+import type { Organization } from '@/lib/schema';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,15 +8,15 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
 
     if (userId) {
-      const organization = db.prepare(`
+      const organization = getOne<Organization>(`
         SELECT o.* FROM organizations o
         JOIN users u ON o.id = u.organization_id
         WHERE u.id = ?
-      `).get(userId);
+      `, userId);
       return NextResponse.json(organization ? [organization] : []);
     }
 
-    const organizations = db.prepare('SELECT * FROM organizations').all();
+    const organizations = getAll<Organization>('SELECT * FROM organizations');
     return NextResponse.json(organizations);
   } catch (error) {
     console.error(error);

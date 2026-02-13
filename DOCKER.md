@@ -78,7 +78,7 @@ rm -rf data/
 
 ## Authorization Model
 
-The OpenFGA authorization model is automatically loaded from `src/lib/openfga/model.fga` when you run the setup script. The model includes:
+The OpenFGA authorization model is automatically loaded from `openfga/model.fga` when you run the setup script. The model includes:
 
 - **Organizations**: Top-level containers with member management
 - **Groups**: Scoped collections of users within organizations

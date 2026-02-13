@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@/context/UserContext';
 
 interface Group {
   id: number;
   name: string;
   organization_id: number;
-  user_ids?: number[];
 }
 
 interface User {
   id: number;
   name: string;
+  email: string;
   organization_id: number;
 }
 
@@ -20,78 +20,95 @@ const GroupsTab = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [name, setName] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
-  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [membersByGroup, setMembersByGroup] = useState<Record<number, User[]>>({});
+  const [addingMemberToGroup, setAddingMemberToGroup] = useState<number | null>(null);
+  const [selectedNewMemberId, setSelectedNewMemberId] = useState<string>('');
+  const [pageByGroup, setPageByGroup] = useState<Record<number, number>>({});
   const { currentUser, users } = useUser();
 
-  const fetchGroups = async () => {
+  const usersInSameOrg = users.filter(u => u.organization_id === currentUser?.organization_id);
+
+  const fetchGroupMembers = useCallback(async (groupId: number) => {
+    const res = await fetch(`/api/groups/${groupId}`);
+    const data = await res.json();
+    setMembersByGroup(prev => ({ ...prev, [groupId]: data.users || [] }));
+  }, []);
+
+  const fetchGroups = useCallback(async () => {
     if (currentUser) {
       const res = await fetch(`/api/groups?organizationId=${currentUser.organization_id}`);
-      const data = await res.json();
+      const data: Group[] = await res.json();
       setGroups(data);
+      data.forEach(group => fetchGroupMembers(group.id));
     } else {
       setGroups([]);
+      setMembersByGroup({});
     }
-  };
+  }, [currentUser, fetchGroupMembers]);
 
   useEffect(() => {
     fetchGroups();
-  }, [currentUser, currentUser?.organization_id]);
+  }, [fetchGroups]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
 
-    const groupData = {
-      name,
-      organization_id: currentUser.organization_id,
-      user_ids: selectedUserIds,
-    };
-
-    if (editingGroup) {
-      await fetch(`/api/groups/${editingGroup.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(groupData),
-      });
-    } else {
-      await fetch('/api/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(groupData),
-      });
-    }
-    resetForm();
+    await fetch('/api/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        organization_id: currentUser.organization_id,
+        user_ids: selectedUserIds,
+      }),
+    });
+    setName('');
+    setSelectedUserIds([]);
     fetchGroups();
-  };
-
-  const handleEdit = async (group: Group) => {
-    const res = await fetch(`/api/groups/${group.id}`);
-    const data = await res.json();
-    setEditingGroup(data);
-    setName(data.name);
-    setSelectedUserIds(data.users.map((u: User) => u.id));
   };
 
   const handleDelete = async (id: number) => {
-    await fetch(`/api/groups/${id}`, {
-      method: 'DELETE',
-    });
+    await fetch(`/api/groups/${id}`, { method: 'DELETE' });
     fetchGroups();
   };
 
-  const resetForm = () => {
-    setEditingGroup(null);
-    setName('');
-    setSelectedUserIds([]);
+  const handleRemoveMember = async (group: Group, userId: number) => {
+    const currentMembers = membersByGroup[group.id] || [];
+    const updatedIds = currentMembers.filter(u => u.id !== userId).map(u => u.id);
+    await fetch(`/api/groups/${group.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: group.name, user_ids: updatedIds }),
+    });
+    fetchGroupMembers(group.id);
   };
 
-  const usersInSameOrg = users.filter(u => u.organization_id === currentUser?.organization_id);
+  const handleAddMember = async (group: Group) => {
+    if (!selectedNewMemberId) return;
+    const currentMembers = membersByGroup[group.id] || [];
+    const updatedIds = [...currentMembers.map(u => u.id), Number(selectedNewMemberId)];
+    await fetch(`/api/groups/${group.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: group.name, user_ids: updatedIds }),
+    });
+    setAddingMemberToGroup(null);
+    setSelectedNewMemberId('');
+    fetchGroupMembers(group.id);
+  };
+
+  const getAvailableUsers = (groupId: number) => {
+    const currentMembers = membersByGroup[groupId] || [];
+    const memberIds = new Set(currentMembers.map(u => u.id));
+    return usersInSameOrg.filter(u => !memberIds.has(u.id));
+  };
 
   return (
     <div className="space-y-6">
       {currentUser ? (
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">{editingGroup ? 'Edit Group' : 'Add a New Group'}</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Add a New Group</h2>
           <form onSubmit={handleSubmit} className="p-4 bg-gray-50 rounded-lg shadow-sm space-y-4">
             <input
               type="text"
@@ -102,7 +119,7 @@ const GroupsTab = () => {
               required
             />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assign Users</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Initial Members</label>
               <select
                 multiple
                 value={selectedUserIds.map(String)}
@@ -114,9 +131,8 @@ const GroupsTab = () => {
                 ))}
               </select>
             </div>
-            <div className="flex justify-end space-x-3">
-              {editingGroup && <button type="button" onClick={resetForm} className="px-6 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition">Cancel</button>}
-              <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">{editingGroup ? 'Update Group' : 'Add Group'}</button>
+            <div className="flex justify-end">
+              <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">Add Group</button>
             </div>
           </form>
         </div>
@@ -128,16 +144,102 @@ const GroupsTab = () => {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Current Groups</h2>
         {currentUser ? (
           groups.length > 0 ? (
-            <ul className="space-y-3">
-              {groups.map((group) => (
-                <li key={group.id} className="flex justify-between items-center p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition">
-                  <p className="font-semibold text-gray-700">{group.name}</p>
-                  <div className="flex space-x-2">
-                    <button onClick={() => handleEdit(group)} className="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition">Edit</button>
-                    <button onClick={() => handleDelete(group.id)} className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Delete</button>
-                  </div>
-                </li>
-              ))}
+            <ul className="space-y-4">
+              {groups.map((group) => {
+                const members = membersByGroup[group.id] || [];
+                const availableUsers = getAvailableUsers(group.id);
+                const PAGE_SIZE = 5;
+                const page = pageByGroup[group.id] || 0;
+                const totalPages = Math.ceil(members.length / PAGE_SIZE);
+                const pagedMembers = members.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+                return (
+                  <li key={group.id} className="p-4 bg-white rounded-lg shadow-md">
+                    <div className="flex justify-between items-center mb-3">
+                      <div>
+                        <p className="font-semibold text-gray-700 text-lg">{group.name}</p>
+                        <p className="text-sm text-gray-500">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+                      </div>
+                      <button onClick={() => handleDelete(group.id)} className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Delete</button>
+                    </div>
+
+                    {members.length > 0 && (
+                      <>
+                        <ul className="space-y-2 mb-3">
+                          {pagedMembers.map(member => (
+                            <li key={member.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium text-gray-700">{member.name}</p>
+                                <p className="text-sm text-gray-500">{member.email}</p>
+                              </div>
+                              <button
+                                onClick={() => handleRemoveMember(group, member.id)}
+                                className="px-3 py-1 text-sm bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 transition"
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between mb-3">
+                            <button
+                              onClick={() => setPageByGroup(prev => ({ ...prev, [group.id]: page - 1 }))}
+                              disabled={page === 0}
+                              className="px-3 py-1 text-sm font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            >
+                              Previous
+                            </button>
+                            <span className="text-sm text-gray-500">Page {page + 1} of {totalPages}</span>
+                            <button
+                              onClick={() => setPageByGroup(prev => ({ ...prev, [group.id]: page + 1 }))}
+                              disabled={page >= totalPages - 1}
+                              className="px-3 py-1 text-sm font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {addingMemberToGroup === group.id ? (
+                      <div className="flex items-center space-x-2">
+                        <select
+                          value={selectedNewMemberId}
+                          onChange={(e) => setSelectedNewMemberId(e.target.value)}
+                          className="flex-1 border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                        >
+                          <option value="" disabled>Select a user</option>
+                          {availableUsers.map(user => (
+                            <option key={user.id} value={user.id}>{user.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => handleAddMember(group)}
+                          className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+                        >
+                          Add
+                        </button>
+                        <button
+                          onClick={() => { setAddingMemberToGroup(null); setSelectedNewMemberId(''); }}
+                          className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      availableUsers.length > 0 && (
+                        <button
+                          onClick={() => setAddingMemberToGroup(group.id)}
+                          className="px-4 py-2 text-sm bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
+                        >
+                          + Add Member
+                        </button>
+                      )
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-gray-500">No groups found for this organization.</p>

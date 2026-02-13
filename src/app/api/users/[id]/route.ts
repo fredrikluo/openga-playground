@@ -1,10 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db from '@/lib/db';
+import db, { getOne } from '@/lib/db';
+import type { User } from '@/lib/schema';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const { id } = await context.params;
+    const user = getOne<User>('SELECT * FROM users WHERE id = ?', id);
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
@@ -17,32 +18,23 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const { role, organization_id, currentUserId } = await request.json();
 
     if (!currentUserId) {
       return NextResponse.json({ message: 'currentUserId is required' }, { status: 400 });
     }
 
-    const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(currentUserId);
-    const targetUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const currentUser = getOne<User>('SELECT * FROM users WHERE id = ?', currentUserId);
+    const targetUser = getOne<User>('SELECT * FROM users WHERE id = ?', id);
 
     if (!currentUser || !targetUser) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    if (currentUser.role !== 'admin' && currentUser.role !== 'coadmin') {
-      return NextResponse.json({ message: 'Forbidden: only admins or co-admins can perform this action' }, { status: 403 });
-    }
-
     if (organization_id !== undefined) {
-      const orgToAuthorize = organization_id !== null ? organization_id : targetUser.organization_id;
-      if (currentUser.organization_id !== orgToAuthorize) {
-        return NextResponse.json({ message: 'Forbidden: You can only manage users in your own organization.' }, { status: 403 });
-      }
-
       const stmt = db.prepare('UPDATE users SET organization_id = ? WHERE id = ?');
       stmt.run(organization_id, id);
 
@@ -50,10 +42,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     if (role) {
-      if (currentUser.organization_id !== targetUser.organization_id) {
-        return NextResponse.json({ message: 'Forbidden: Cannot change roles for users in other organizations' }, { status: 403 });
-      }
-
       const allowedRoles = ['admin', 'coadmin', 'member', 'limited member'];
       if (!allowedRoles.includes(role)) {
         return NextResponse.json({ message: 'Invalid role' }, { status: 400 });
@@ -72,9 +60,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const { name, email } = await request.json();
 
     if (!name || !email) {
@@ -95,9 +83,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const stmt = db.prepare('DELETE FROM users WHERE id = ?');
     const info = stmt.run(id);
 

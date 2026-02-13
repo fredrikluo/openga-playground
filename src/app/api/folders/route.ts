@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { getAll } from '@/lib/db';
+import type { Folder } from '@/lib/schema';
 
 export async function GET() {
   try {
-    const folders = db.prepare('SELECT * FROM folders').all();
+    const folders = getAll<Folder>('SELECT * FROM folders');
     return NextResponse.json(folders);
   } catch (error) {
     console.error(error);

@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { getOne, getAll } from '@/lib/db';
 import type { Folder, Kahoot } from '@/lib/schema';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
-    const folder = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Folder;
+    const { id } = await context.params;
+    const folder = getOne<Folder>('SELECT * FROM folders WHERE id = ?', id);
     if (!folder) {
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
     }
-    const subfolders = db.prepare('SELECT * FROM folders WHERE parent_folder_id = ?').all(id) as Folder[];
-    const kahoots = db.prepare('SELECT * FROM kahoots WHERE folder_id = ?').all(id) as Kahoot[];
+    const subfolders = getAll<Folder>('SELECT * FROM folders WHERE parent_folder_id = ?', id);
+    const kahoots = getAll<Kahoot>('SELECT * FROM kahoots WHERE folder_id = ?', id);
     return NextResponse.json({ ...folder, subfolders, kahoots });
   } catch (error) {
     console.error(error);
@@ -18,9 +18,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
     const { name, parent_folder_id } = await request.json();
     if (!name) {
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
@@ -37,12 +37,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await context.params;
 
     const deleteFolderAndContents = (folderId: number | bigint) => {
-      const subfolders = db.prepare('SELECT id FROM folders WHERE parent_folder_id = ?').all(folderId) as Pick<Folder, 'id'>[];
+      const subfolders = getAll<Pick<Folder, 'id'>>('SELECT id FROM folders WHERE parent_folder_id = ?', folderId);
       for (const subfolder of subfolders) {
         deleteFolderAndContents(subfolder.id);
       }

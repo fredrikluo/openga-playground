@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db from '@/lib/db';
+import db, { getAll } from '@/lib/db';
+import type { Group } from '@/lib/schema';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,11 +8,11 @@ export async function GET(request: NextRequest) {
     const organizationId = searchParams.get('organizationId');
 
     if (organizationId) {
-      const groups = db.prepare('SELECT * FROM groups WHERE organization_id = ?').all(organizationId);
+      const groups = getAll<Group>('SELECT * FROM groups WHERE organization_id = ?', organizationId);
       return NextResponse.json(groups);
     }
 
-    const groups = db.prepare('SELECT * FROM groups').all();
+    const groups = getAll<Group>('SELECT * FROM groups');
     return NextResponse.json(groups);
   } catch (error) {
     console.error(error);

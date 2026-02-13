@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 
-const db = new Database('kahoot.db');
+const db = new Database(process.env.DATABASE_PATH || 'kahoot.db');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -58,5 +58,13 @@ db.exec(`
     FOREIGN KEY (folder_id) REFERENCES folders(id)
   );
 `);
+
+export function getOne<T>(sql: string, ...params: unknown[]): T | undefined {
+  return db.prepare(sql).get(...params) as T | undefined;
+}
+
+export function getAll<T>(sql: string, ...params: unknown[]): T[] {
+  return db.prepare(sql).all(...params) as T[];
+}
 
 export default db;

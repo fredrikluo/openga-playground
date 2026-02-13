@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db from '@/lib/db';
+import db, { getOne, getAll } from '@/lib/db';
+import type { User } from '@/lib/schema';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
     const unassigned = searchParams.get('unassigned');
 
     if (unassigned === 'true') {
-      const users = db.prepare('SELECT * FROM users WHERE organization_id IS NULL').all();
+      const users = getAll<User>('SELECT * FROM users WHERE organization_id IS NULL');
       return NextResponse.json(users);
     }
 
@@ -18,17 +19,17 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ message: 'currentUserId is required' }, { status: 400 });
       }
 
-      const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(currentUserId);
+      const currentUser = getOne<User>('SELECT * FROM users WHERE id = ?', currentUserId);
 
       if (!currentUser || currentUser.organization_id !== parseInt(organizationId, 10)) {
         return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
       }
 
-      const users = db.prepare('SELECT * FROM users WHERE organization_id = ?').all(organizationId);
+      const users = getAll<User>('SELECT * FROM users WHERE organization_id = ?', organizationId);
       return NextResponse.json(users);
     }
 
-    const users = db.prepare('SELECT * FROM users').all();
+    const users = getAll<User>('SELECT * FROM users');
     return NextResponse.json(users);
   } catch (error) {
     console.error(error);
@@ -65,7 +66,10 @@ export async function POST(request: Request) {
     const stmt = db.prepare('INSERT INTO users (name, email, organization_id) VALUES (?, ?, ?)');
     const info = stmt.run(name, email, orgId);
     return NextResponse.json({ id: info.lastInsertRowid, name, email, organization_id: orgId }, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      return NextResponse.json({ message: 'A user with this email already exists' }, { status: 409 });
+    }
     console.error(error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
