@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useOrganization } from '@/context/OrganizationContext';
 
 interface Kahoot {
   id: number;
@@ -14,6 +15,7 @@ interface Folder {
 }
 
 const KahootsTab = () => {
+  const { currentOrganization } = useOrganization();
   const [kahoots, setKahoots] = useState<Kahoot[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [name, setName] = useState('');
@@ -21,20 +23,37 @@ const KahootsTab = () => {
   const [editingKahoot, setEditingKahoot] = useState<Kahoot | null>(null);
 
   useEffect(() => {
-    fetchKahoots();
-    fetchFolders();
-  }, []);
+    if (currentOrganization) {
+      fetchKahoots();
+      fetchFolders();
+    } else {
+      setKahoots([]);
+      setFolders([]);
+    }
+  }, [currentOrganization]);
 
   const fetchKahoots = async () => {
-    const res = await fetch('/api/kahoots');
+    if (!currentOrganization) return;
+    const res = await fetch(`/api/kahoots?organizationId=${currentOrganization.id}`);
     const data = await res.json();
     setKahoots(data);
   };
 
   const fetchFolders = async () => {
-    const res = await fetch('/api/folders');
+    if (!currentOrganization) return;
+
+    // Get organization's hidden root folder ID
+    const orgRes = await fetch(`/api/organizations/${currentOrganization.id}`);
+    const orgData = await orgRes.json();
+    const hiddenRootId = orgData.root_folder_id;
+
+    // Fetch all folders and filter out the hidden root
+    const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`);
     const data = await res.json();
-    setFolders(data);
+
+    // Filter out the hidden root folder
+    const visibleFolders = data.filter((folder: Folder) => folder.id !== hiddenRootId);
+    setFolders(visibleFolders);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,6 +100,14 @@ const KahootsTab = () => {
     const folder = folders.find((f) => f.id === folderId);
     return folder ? folder.name : '...';
   };
+
+  if (!currentOrganization) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500 text-lg">Please select an organization to view kahoots</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

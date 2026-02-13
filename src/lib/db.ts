@@ -63,6 +63,12 @@ db.exec(`
   );
 `);
 
+// Create unique index to ensure folder names are unique within the same parent folder
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_folder_name_per_parent
+  ON folders(name, parent_folder_id, organization_id);
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS kahoots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -11,6 +11,7 @@ interface SubFolder {
   id: number;
   name: string;
   parent_folder_id: number | null;
+  organization_id?: number;
 }
 
 interface FolderViewProps {

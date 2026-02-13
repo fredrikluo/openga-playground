@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import db, { getAll } from '@/lib/db';
 import type { User } from '@/lib/schema';
+import { addUserToOrganization } from '@/lib/user-organization-helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,43 +52,51 @@ export async function POST(request: Request) {
     // If creating a new organization
     if (newOrganization) {
       const orgTransaction = db.transaction(() => {
-        const folderStmt = db.prepare('INSERT INTO folders (name, organization_id) VALUES (?, NULL)');
-        const folderInfo = folderStmt.run(`${newOrganization} Shared Folder`);
-        const rootFolderId = folderInfo.lastInsertRowid;
+        // Create hidden root folder (not displayed in UI)
+        const hiddenRootStmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, NULL, NULL)');
+        const hiddenRootInfo = hiddenRootStmt.run(`${newOrganization} Root`);
+        const hiddenRootId = hiddenRootInfo.lastInsertRowid;
 
+        // Create organization
         const orgStmt = db.prepare('INSERT INTO organizations (name, root_folder_id) VALUES (?, ?)');
-        const orgInfo = orgStmt.run(newOrganization, rootFolderId);
+        const orgInfo = orgStmt.run(newOrganization, hiddenRootId);
         const newOrgId = orgInfo.lastInsertRowid;
 
-        // Update folder's organization_id
-        const updateFolderStmt = db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?');
-        updateFolderStmt.run(newOrgId, rootFolderId);
+        // Update hidden root folder's organization_id
+        const updateHiddenRootStmt = db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?');
+        updateHiddenRootStmt.run(newOrgId, hiddenRootId);
+
+        // Create shared folder under the hidden root
+        const sharedFolderStmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, ?, ?)');
+        sharedFolderStmt.run(`${newOrganization} Shared Folder`, hiddenRootId, newOrgId);
 
         return newOrgId as number;
       });
       orgId = orgTransaction();
     }
 
-    // Create user and optionally add to organization
+    // Create user
     const transaction = db.transaction(() => {
-      // Create user
       const userStmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
       const userInfo = userStmt.run(name, email);
-      const userId = userInfo.lastInsertRowid as number;
-
-      // Add to organization if provided
-      if (orgId) {
-        const orgStmt = db.prepare(`
-          INSERT INTO user_organizations (user_id, organization_id, role)
-          VALUES (?, ?, ?)
-        `);
-        orgStmt.run(userId, orgId, role);
-      }
-
-      return { id: userId, name, email };
+      return { id: userInfo.lastInsertRowid as number, name, email };
     });
 
     const newUser = transaction();
+
+    // Add to organization if provided (this creates the personal folder)
+    if (orgId) {
+      try {
+        addUserToOrganization(newUser.id, orgId, role);
+      } catch (orgError: unknown) {
+        if (orgError instanceof Error && orgError.message.includes('A user with this name already exists')) {
+          // Delete the user we just created since adding to org failed
+          db.prepare('DELETE FROM users WHERE id = ?').run(newUser.id);
+          return NextResponse.json({ message: orgError.message }, { status: 409 });
+        }
+        throw orgError;
+      }
+    }
     return NextResponse.json(newUser, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {

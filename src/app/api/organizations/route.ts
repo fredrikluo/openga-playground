@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import db, { getAll } from '@/lib/db';
 import type { Organization } from '@/lib/schema';
+import { addUserToOrganization } from '@/lib/user-organization-helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,31 +38,31 @@ export async function POST(request: Request) {
     }
 
     const transaction = db.transaction(() => {
-      // Create root folder
-      const folderStmt = db.prepare('INSERT INTO folders (name, organization_id) VALUES (?, NULL)');
-      const folderInfo = folderStmt.run(`${name} Shared Folder`);
-      const rootFolderId = folderInfo.lastInsertRowid;
+      // Create hidden root folder (not displayed in UI)
+      const hiddenRootStmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, NULL, NULL)');
+      const hiddenRootInfo = hiddenRootStmt.run(`${name} Root`);
+      const hiddenRootId = hiddenRootInfo.lastInsertRowid;
 
       // Create organization
       const orgStmt = db.prepare('INSERT INTO organizations (name, root_folder_id) VALUES (?, ?)');
-      const orgInfo = orgStmt.run(name, rootFolderId);
+      const orgInfo = orgStmt.run(name, hiddenRootId);
       const orgId = orgInfo.lastInsertRowid;
 
-      // Update folder's organization_id
-      const updateFolderStmt = db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?');
-      updateFolderStmt.run(orgId, rootFolderId);
+      // Update hidden root folder's organization_id
+      const updateHiddenRootStmt = db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?');
+      updateHiddenRootStmt.run(orgId, hiddenRootId);
 
-      // Add user to organization via junction table
-      const userOrgStmt = db.prepare(`
-        INSERT INTO user_organizations (user_id, organization_id, role)
-        VALUES (?, ?, ?)
-      `);
-      userOrgStmt.run(userId, orgId, userRole);
+      // Create shared folder under the hidden root
+      const sharedFolderStmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, ?, ?)');
+      sharedFolderStmt.run(`${name} Shared Folder`, hiddenRootId, orgId);
 
-      return { id: orgId, name, root_folder_id: rootFolderId };
+      return { id: orgId, name, root_folder_id: hiddenRootId };
     });
 
     const newOrg = transaction();
+
+    // Add user to organization (creates personal folder)
+    addUserToOrganization(userId, newOrg.id, userRole);
 
     return NextResponse.json(newOrg, { status: 201 });
   } catch (error) {

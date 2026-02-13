@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import db, { getOne } from '@/lib/db';
 import type { User } from '@/lib/schema';
+import { addUserToOrganization, removeUserFromOrganization } from '@/lib/user-organization-helpers';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -30,21 +31,20 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     // Add user to organization
     if (action === 'add_to_org' && organization_id) {
-      const stmt = db.prepare(`
-        INSERT OR REPLACE INTO user_organizations (user_id, organization_id, role)
-        VALUES (?, ?, ?)
-      `);
-      stmt.run(id, organization_id, role || 'member');
-      return NextResponse.json({ message: 'User added to organization' });
+      try {
+        addUserToOrganization(id, organization_id, role || 'member');
+        return NextResponse.json({ message: 'User added to organization' });
+      } catch (orgError: unknown) {
+        if (orgError instanceof Error && orgError.message.includes('A user with this name already exists')) {
+          return NextResponse.json({ message: orgError.message }, { status: 409 });
+        }
+        throw orgError;
+      }
     }
 
     // Remove user from organization
     if (action === 'remove_from_org' && organization_id) {
-      const stmt = db.prepare(`
-        DELETE FROM user_organizations
-        WHERE user_id = ? AND organization_id = ?
-      `);
-      stmt.run(id, organization_id);
+      removeUserFromOrganization(id, organization_id);
       return NextResponse.json({ message: 'User removed from organization' });
     }
 
@@ -97,12 +97,26 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const stmt = db.prepare('DELETE FROM users WHERE id = ?');
-    const info = stmt.run(id);
 
-    if (info.changes === 0) {
+    // Check if user exists
+    const user = getOne<User>('SELECT * FROM users WHERE id = ?', id);
+    if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
+
+    // Get all organizations the user belongs to
+    const userOrgs = db.prepare(`
+      SELECT organization_id FROM user_organizations WHERE user_id = ?
+    `).all(id) as { organization_id: number }[];
+
+    // Remove user from all organizations (this deletes their personal folders)
+    for (const org of userOrgs) {
+      removeUserFromOrganization(id, org.organization_id);
+    }
+
+    // Now delete the user
+    const stmt = db.prepare('DELETE FROM users WHERE id = ?');
+    stmt.run(id);
 
     return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error) {

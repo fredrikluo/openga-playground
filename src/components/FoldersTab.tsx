@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import FolderView from './FolderView';
 import { List, Grid } from 'lucide-react';
+import { useOrganization } from '@/context/OrganizationContext';
 
 interface Folder {
   id: number;
   name: string;
   parent_folder_id: number | null;
+  organization_id: number;
 }
 
 interface Kahoot {
@@ -24,33 +26,48 @@ interface FolderContent {
 }
 
 const FoldersTab = () => {
+  const { currentOrganization } = useOrganization();
   const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
   const [folderContent, setFolderContent] = useState<FolderContent | null>(null);
   const [name, setName] = useState('');
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    fetchFolderContent(currentFolderId);
-    fetchAllFolders();
-  }, [currentFolderId]);
+    if (currentOrganization) {
+      fetchFolderContent(currentFolderId);
+      fetchAllFolders();
+    } else {
+      setFolderContent(null);
+      setAllFolders([]);
+    }
+  }, [currentFolderId, currentOrganization]);
 
   const fetchAllFolders = async () => {
-    const res = await fetch('/api/folders');
+    if (!currentOrganization) return;
+    const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`);
     const data = await res.json();
     setAllFolders(data);
   };
 
   const fetchFolderContent = async (folderId: number | null) => {
+    if (!currentOrganization) return;
+
     if (folderId === null) {
-      const res = await fetch('/api/folders');
+      // At root level, show children of the hidden root folder (not the hidden root itself)
+      const orgRes = await fetch(`/api/organizations/${currentOrganization.id}`);
+      const orgData = await orgRes.json();
+      const hiddenRootId = orgData.root_folder_id;
+
+      const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`);
       const data = await res.json();
       setFolderContent({
         id: 0,
         name: 'Home',
         parent_folder_id: null,
-        subfolders: data.filter((f: Folder) => f.parent_folder_id === null),
+        subfolders: data.filter((f: Folder) => f.parent_folder_id === hiddenRootId),
         kahoots: [],
       });
     } else {
@@ -64,14 +81,25 @@ const FoldersTab = () => {
     setCurrentFolderId(folderId);
   };
 
-  const handleBackClick = () => {
-    if (folderContent) {
+  const handleBackClick = async () => {
+    if (!folderContent || !currentOrganization) return;
+
+    // Get the hidden root folder ID
+    const orgRes = await fetch(`/api/organizations/${currentOrganization.id}`);
+    const orgData = await orgRes.json();
+    const hiddenRootId = orgData.root_folder_id;
+
+    // If parent is the hidden root, go back to Home (null) instead
+    if (folderContent.parent_folder_id === hiddenRootId) {
+      setCurrentFolderId(null);
+    } else {
       setCurrentFolderId(folderContent.parent_folder_id);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
 
     if (editingFolder) {
       const folderData = {
@@ -83,6 +111,13 @@ const FoldersTab = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(folderData),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        setError(errorData.message || 'Failed to update folder');
+        return;
+      }
+
       const updatedFolder = await res.json();
 
       setAllFolders(allFolders.map(f => f.id === updatedFolder.id ? { ...f, name: updatedFolder.name } : f));
@@ -95,27 +130,42 @@ const FoldersTab = () => {
       }
 
     } else {
+      if (!currentOrganization) return;
+
+      // Get the organization's hidden root folder ID for creating folders at root level
+      let parentFolderId = currentFolderId;
+      if (currentFolderId === null) {
+        const orgRes = await fetch(`/api/organizations/${currentOrganization.id}`);
+        const orgData = await orgRes.json();
+        parentFolderId = orgData.root_folder_id;
+      }
+
       const folderData = {
         name,
-        parent_folder_id: currentFolderId,
+        parent_folder_id: parentFolderId,
+        organization_id: currentOrganization.id,
       };
       const res = await fetch('/api/folders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(folderData),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        setError(errorData.message || 'Failed to create folder');
+        return;
+      }
+
       const newFolder = await res.json();
 
       setAllFolders([...allFolders, newFolder]);
 
-      if (folderContent && newFolder.parent_folder_id === currentFolderId) {
-          setFolderContent({
-              ...folderContent,
-              subfolders: [...folderContent.subfolders, newFolder]
-          });
-      } else if (currentFolderId === null && newFolder.parent_folder_id === null) {
-        // This handles adding a folder to the root when viewing the root
-        setFolderContent(prev => prev ? { ...prev, subfolders: [...prev.subfolders, newFolder]} : null);
+      if (folderContent) {
+        setFolderContent({
+          ...folderContent,
+          subfolders: [...folderContent.subfolders, newFolder]
+        });
       }
     }
     resetForm();
@@ -173,7 +223,16 @@ const FoldersTab = () => {
   const resetForm = () => {
     setEditingFolder(null);
     setName('');
+    setError('');
   };
+
+  if (!currentOrganization) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500 text-lg">Please select an organization to view folders</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -181,6 +240,11 @@ const FoldersTab = () => {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">
           {editingFolder ? 'Edit Folder' : 'Add a New Folder'}
         </h2>
+        {error && (
+          <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="p-4 bg-gray-50 rounded-lg shadow-sm space-y-4">
           <div className="flex items-end gap-4">
             <input

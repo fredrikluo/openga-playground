@@ -31,7 +31,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
     }
     return NextResponse.json({ id, name, parent_folder_id });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      return NextResponse.json({ message: 'A folder with this name already exists at this location' }, { status: 409 });
+    }
     console.error(error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }

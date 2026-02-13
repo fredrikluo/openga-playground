@@ -73,14 +73,30 @@ const OrganizationsTab = () => {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (currentUser) {
-      await fetch('/api/organizations', {
+      const res = await fetch('/api/organizations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newOrganizationName, userId: currentUser.id }),
       });
-      setNewOrganizationName('');
-      fetchOrganizations();
-      refetchUsers();
+
+      if (res.ok) {
+        const newOrg = await res.json();
+        setNewOrganizationName('');
+        fetchOrganizations();
+        fetchAllOrganizations();
+        refetchUsers();
+
+        // Update global organizations list and set as current
+        const userOrgsRes = await fetch(`/api/users/${currentUser.id}/organizations`);
+        const userOrgs = await userOrgsRes.json();
+        setGlobalOrganizations(userOrgs);
+
+        // Set the newly created organization as current
+        const createdOrg = userOrgs.find((org: Organization) => org.id === newOrg.id);
+        if (createdOrg) {
+          setCurrentOrganization(createdOrg);
+        }
+      }
     }
   };
 
@@ -127,7 +143,7 @@ const OrganizationsTab = () => {
 
   const handleAddMember = async (organizationId: number) => {
     if (!selectedUser || !currentUser) return;
-    await fetch(`/api/users/${selectedUser}`, {
+    const res = await fetch(`/api/users/${selectedUser}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -136,6 +152,13 @@ const OrganizationsTab = () => {
         role: 'member'
       }),
     });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      alert(errorData.message || 'Failed to add user to organization');
+      return;
+    }
+
     fetchOrgUsers(organizationId);
     fetchAllUsers();
     refetchUsers();
@@ -169,7 +192,7 @@ const OrganizationsTab = () => {
 
   const handleJoinOrganization = async () => {
     if (!selectedOrgToJoin || !currentUser) return;
-    await fetch(`/api/users/${currentUser.id}`, {
+    const res = await fetch(`/api/users/${currentUser.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -178,13 +201,20 @@ const OrganizationsTab = () => {
         role: 'member'
       }),
     });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      alert(errorData.message || 'Failed to join organization');
+      return;
+    }
+
     setSelectedOrgToJoin('');
     fetchOrganizations();
     fetchAllOrganizations();
 
     // Update global organizations list
-    const res = await fetch(`/api/users/${currentUser.id}/organizations`);
-    const userOrgs = await res.json();
+    const userOrgsRes = await fetch(`/api/users/${currentUser.id}/organizations`);
+    const userOrgs = await userOrgsRes.json();
     setGlobalOrganizations(userOrgs);
   };
 
