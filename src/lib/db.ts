@@ -42,11 +42,24 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS user_organizations (
+    user_id INTEGER NOT NULL,
+    organization_id INTEGER NOT NULL,
+    role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('admin', 'coadmin', 'member', 'limited member')),
+    PRIMARY KEY (user_id, organization_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+  );
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS folders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     parent_folder_id INTEGER,
-    FOREIGN KEY (parent_folder_id) REFERENCES folders(id)
+    organization_id INTEGER,
+    FOREIGN KEY (parent_folder_id) REFERENCES folders(id),
+    FOREIGN KEY (organization_id) REFERENCES organizations(id)
   );
 `);
 

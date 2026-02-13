@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=openfga
+      - POSTGRES_PASSWORD=openfga
+      - POSTGRES_DB=openfga
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openfga"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build:
       context: .
@@ -26,16 +42,19 @@ services:
       - "8081:8081"  # gRPC port
       - "3001:3001"  # playground port
     environment:
-      - OPENFGA_DATASTORE_ENGINE=sqlite
-      - OPENFGA_DATASTORE_URI=file:/data/openfga.db
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable
       - OPENFGA_LOG_LEVEL=info
       - OPENFGA_PLAYGROUND_ENABLED=true
       - OPENFGA_PLAYGROUND_PORT=3001
       - OPENFGA_HTTP_ADDR=0.0.0.0:8080
       - OPENFGA_GRPC_ADDR=0.0.0.0:8081
+      - OPENFGA_HTTP_CORS_ALLOWED_ORIGINS=https://play.fga.dev,http://localhost:3001
+      - OPENFGA_HTTP_CORS_ALLOWED_HEADERS=*
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      # Persist OpenFGA data
-      - ./data/openfga:/data
       # Mount the authorization model for easy access
       - ./openfga:/models
     networks:

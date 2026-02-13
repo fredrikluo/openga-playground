@@ -10,8 +10,20 @@ export interface User {
   id: number;
   name: string;
   email: string;
+}
+
+export interface UserOrganization {
+  user_id: number;
   organization_id: number;
   role: UserRole;
+}
+
+export interface UserWithOrganizations extends User {
+  organizations: Array<{
+    id: number;
+    name: string;
+    role: UserRole;
+  }>;
 }
 
 export interface Group {

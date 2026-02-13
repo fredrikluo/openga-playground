@@ -1,5 +1,6 @@
 import Tabs from '@/components/Tabs';
 import CurrentUserSelector from '@/components/CurrentUserSelector';
+import OrganizationSelector from '@/components/OrganizationSelector';
 
 export default function Home() {
   return (
@@ -10,8 +11,9 @@ export default function Home() {
             Kahoot Permission Emulator
           </h1>
         </div>
-        <div className="mb-8">
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
           <CurrentUserSelector />
+          <OrganizationSelector />
         </div>
         <div className="bg-white rounded-lg shadow-xl">
           <Tabs />

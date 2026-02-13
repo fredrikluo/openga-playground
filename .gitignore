@@ -33,3 +33,5 @@ yarn-error.log*
 # SQLite
 *.db
 *.db-journal
+
+data/*

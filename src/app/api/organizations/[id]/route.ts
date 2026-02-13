@@ -40,18 +40,35 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const { id } = await context.params;
 
     const transaction = db.transaction(() => {
-      const org = getOne<Organization>('SELECT root_folder_id FROM organizations WHERE id = ?', id);
+      const org = getOne<Organization>('SELECT * FROM organizations WHERE id = ?', id);
       if (!org) {
         return { changes: 0 };
       }
 
-      const deleteOrgStmt = db.prepare('DELETE FROM organizations WHERE id = ?');
-      const info = deleteOrgStmt.run(id);
+      // Delete in proper order to avoid foreign key constraints:
+      // Note: There's a circular reference between organizations.root_folder_id and folders.organization_id
 
-      if (info.changes > 0) {
-        const deleteFolderStmt = db.prepare('DELETE FROM folders WHERE id = ?');
-        deleteFolderStmt.run(org.root_folder_id);
-      }
+      // 1. Delete all kahoots in folders belonging to this organization
+      db.prepare(`
+        DELETE FROM kahoots
+        WHERE folder_id IN (
+          SELECT id FROM folders WHERE organization_id = ?
+        )
+      `).run(id);
+
+      // 2. Break the circular reference by setting root_folder_id to NULL
+      db.prepare('UPDATE organizations SET root_folder_id = NULL WHERE id = ?').run(id);
+
+      // 3. Delete all folders belonging to this organization (now safe)
+      db.prepare('DELETE FROM folders WHERE organization_id = ?').run(id);
+
+      // 4. Delete all groups belonging to this organization
+      db.prepare('DELETE FROM groups WHERE organization_id = ?').run(id);
+
+      // 5. user_organizations will auto-delete due to ON DELETE CASCADE
+
+      // 6. Finally delete the organization
+      const info = db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
 
       return info;
     });
