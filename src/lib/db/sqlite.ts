@@ -28,14 +28,18 @@ export function createSqliteDatabase(path: string): Database {
     },
 
     async transaction<T>(fn: (txDb: Database) => Promise<T>): Promise<T> {
-      // better-sqlite3 transactions are synchronous, but our fn is async.
-      // Since SQLite is single-connection and sync, we can just run the async fn
-      // directly — the awaits inside will resolve immediately because all db
-      // calls in the SQLite adapter are synchronous under the hood.
-      const sqliteTx = sqlite.transaction(async () => {
-        return await fn(db);
-      });
-      return await sqliteTx();
+      // better-sqlite3 doesn't allow async transaction callbacks.
+      // Since all SQLite adapter methods are synchronous under the hood,
+      // we use manual BEGIN/COMMIT/ROLLBACK instead.
+      sqlite.exec('BEGIN');
+      try {
+        const result = await fn(db);
+        sqlite.exec('COMMIT');
+        return result;
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
     },
   };
 
