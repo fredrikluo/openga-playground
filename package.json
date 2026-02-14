@@ -10,6 +10,7 @@
     "db:init": "ts-node --project tsconfig.cjs.json src/lib/init-db.ts"
   },
   "dependencies": {
+    "@openfga/sdk": "^0.9.2",
     "better-sqlite3": "^12.4.1",
     "lucide-react": "^0.545.0",
     "next": "15.5.4",

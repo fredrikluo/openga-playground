@@ -1,7 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll } from '@/lib/db';
-import type { User } from '@/lib/schema';
+import db, { getAll, getOne } from '@/lib/db';
+import type { User, Organization, Folder } from '@/lib/schema';
 import { addUserToOrganization } from '@/lib/user-organization-helpers';
+import { writeOrgMemberTuple, writeFolderTuples } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,6 +96,35 @@ export async function POST(request: Request) {
           return NextResponse.json({ message: orgError.message }, { status: 409 });
         }
         throw orgError;
+      }
+
+      // Sync OpenFGA: org membership + personal folder
+      await writeOrgMemberTuple(newUser.id, orgId);
+      if (newOrganization) {
+        // Also write folder tuples for the new org's root + shared + personal folders
+        const org = getOne<Organization>('SELECT * FROM organizations WHERE id = ?', orgId);
+        if (org) {
+          await writeFolderTuples(org.root_folder_id, orgId, null);
+          const childFolders = getAll<Folder>(
+            'SELECT * FROM folders WHERE parent_folder_id = ? AND organization_id = ?',
+            org.root_folder_id, orgId
+          );
+          for (const folder of childFolders) {
+            await writeFolderTuples(folder.id, orgId, org.root_folder_id);
+          }
+        }
+      } else {
+        // Just the personal folder
+        const org = getOne<Organization>('SELECT root_folder_id FROM organizations WHERE id = ?', orgId);
+        if (org) {
+          const personalFolder = getOne<Folder>(
+            'SELECT * FROM folders WHERE name = ? AND parent_folder_id = ? AND organization_id = ?',
+            name, org.root_folder_id, orgId
+          );
+          if (personalFolder) {
+            await writeFolderTuples(personalFolder.id, orgId, org.root_folder_id);
+          }
+        }
       }
     }
     return NextResponse.json(newUser, { status: 201 });

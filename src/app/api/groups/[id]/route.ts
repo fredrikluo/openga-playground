@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import db, { getOne, getAll } from '@/lib/db';
 import type { Group, User } from '@/lib/schema';
+import { syncGroupMembers, deleteGroupTuples } from '@/lib/openfga-tuples';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -24,6 +25,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!name) {
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
     }
+
+    // Collect old members before the transaction replaces them
+    const oldMembers = getAll<{ user_id: number }>('SELECT user_id FROM group_users WHERE group_id = ?', id);
 
     const transaction = db.transaction(() => {
       const updateStmt = db.prepare('UPDATE groups SET name = ? WHERE id = ?');
@@ -50,6 +54,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (info.changes === 0) {
       return NextResponse.json({ message: 'Group not found' }, { status: 404 });
     }
+
+    // Sync OpenFGA: update group member tuples
+    const oldMemberIds = oldMembers.map(m => m.user_id);
+    await syncGroupMembers(Number(id), oldMemberIds, user_ids || []);
+
     return NextResponse.json({ id, name, user_ids });
   } catch (error) {
     console.error(error);
@@ -60,6 +69,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+
+    // Collect group info before deletion for tuple cleanup
+    const group = getOne<Group>('SELECT * FROM groups WHERE id = ?', id);
+    const members = getAll<{ user_id: number }>('SELECT user_id FROM group_users WHERE group_id = ?', id);
 
     const transaction = db.transaction(() => {
       const deleteUsersStmt = db.prepare('DELETE FROM group_users WHERE group_id = ?');
@@ -75,6 +88,12 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     if (info.changes === 0) {
       return NextResponse.json({ message: 'Group not found' }, { status: 404 });
     }
+
+    // Clean up OpenFGA tuples
+    if (group) {
+      await deleteGroupTuples(Number(id), group.organization_id, members.map(m => m.user_id));
+    }
+
     return NextResponse.json({ message: 'Group deleted successfully' });
   } catch (error) {
     console.error(error);

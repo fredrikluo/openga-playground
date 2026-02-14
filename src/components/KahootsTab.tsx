@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useUser } from '@/context/UserContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Kahoot {
   id: number;
@@ -16,11 +18,16 @@ interface Folder {
 
 const KahootsTab = () => {
   const { currentOrganization } = useOrganization();
+  const { currentUser } = useUser();
   const [kahoots, setKahoots] = useState<Kahoot[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [name, setName] = useState('');
   const [folderId, setFolderId] = useState<number | ''>('');
   const [editingKahoot, setEditingKahoot] = useState<Kahoot | null>(null);
+  const [selectedKahootId, setSelectedKahootId] = useState<number | null>(null);
+
+  // Check permissions for the selected kahoot (document)
+  const { permissions } = usePermissions(currentUser?.id, 'document', selectedKahootId);
 
   useEffect(() => {
     if (currentOrganization) {
@@ -146,14 +153,34 @@ const KahootsTab = () => {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Current Kahoots</h2>
         <ul className="space-y-3">
           {kahoots.map((kahoot) => (
-            <li key={kahoot.id} className="flex justify-between items-center p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition">
+            <li
+              key={kahoot.id}
+              className={`flex justify-between items-center p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition cursor-pointer ${
+                selectedKahootId === kahoot.id ? 'ring-2 ring-purple-400' : ''
+              }`}
+              onClick={() => setSelectedKahootId(selectedKahootId === kahoot.id ? null : kahoot.id)}
+            >
               <div>
                 <p className="font-semibold text-gray-700">{kahoot.name}</p>
                 <p className="text-sm text-gray-500">Folder: {getFolderName(kahoot.folder_id)}</p>
+                {selectedKahootId === kahoot.id && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {Object.entries(permissions).map(([perm, allowed]) => (
+                      <span
+                        key={perm}
+                        className={`px-1.5 py-0.5 rounded text-xs ${
+                          allowed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {perm.replace('_effective', '').replace('can_', '')}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex space-x-2">
-                <button onClick={() => handleEdit(kahoot)} className="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition">Edit</button>
-                <button onClick={() => handleDelete(kahoot.id)} className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Delete</button>
+                <button onClick={(e) => { e.stopPropagation(); handleEdit(kahoot); }} className="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition">Edit</button>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(kahoot.id); }} className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Delete</button>
               </div>
             </li>
           ))}

@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import FolderView from './FolderView';
-import { List, Grid } from 'lucide-react';
+import { List, Grid, Shield } from 'lucide-react';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useUser } from '@/context/UserContext';
+import { usePermissions, useRoleAssignments } from '@/hooks/usePermissions';
 
 interface Folder {
   id: number;
@@ -25,8 +27,14 @@ interface FolderContent {
   kahoots: Kahoot[];
 }
 
+interface User {
+  id: number;
+  name: string;
+}
+
 const FoldersTab = () => {
   const { currentOrganization } = useOrganization();
+  const { currentUser } = useUser();
   const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
   const [folderContent, setFolderContent] = useState<FolderContent | null>(null);
   const [name, setName] = useState('');
@@ -34,16 +42,42 @@ const FoldersTab = () => {
   const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const [error, setError] = useState<string>('');
+  const [showPermissions, setShowPermissions] = useState(false);
+
+  // Permission hooks
+  const { permissions, loading: permLoading } = usePermissions(
+    currentUser?.id,
+    'folder',
+    currentFolderId
+  );
+  const { assignments, assignRole, removeRole } = useRoleAssignments(
+    'folder',
+    currentFolderId
+  );
+
+  // Users for role assignment
+  const [orgUsers, setOrgUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('viewer');
 
   useEffect(() => {
     if (currentOrganization) {
       fetchFolderContent(currentFolderId);
       fetchAllFolders();
+      fetchOrgUsers();
     } else {
       setFolderContent(null);
       setAllFolders([]);
+      setOrgUsers([]);
     }
   }, [currentFolderId, currentOrganization]);
+
+  const fetchOrgUsers = async () => {
+    if (!currentOrganization) return;
+    const res = await fetch(`/api/users?organizationId=${currentOrganization.id}`);
+    const data = await res.json();
+    setOrgUsers(data);
+  };
 
   const fetchAllFolders = async () => {
     if (!currentOrganization) return;
@@ -234,6 +268,16 @@ const FoldersTab = () => {
     );
   }
 
+  const handleAssignRole = async () => {
+    if (!selectedUserId || !selectedRole || !currentFolderId) return;
+    await assignRole(`user:${selectedUserId}`, selectedRole);
+    setSelectedUserId('');
+  };
+
+  const handleRemoveRole = async (user: string, relation: string) => {
+    await removeRole(user, relation);
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -276,7 +320,19 @@ const FoldersTab = () => {
 
       <div>
         <div className="flex justify-between items-center mb-4">
-          <div />
+          <div>
+            {currentFolderId && (
+              <button
+                onClick={() => setShowPermissions(!showPermissions)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  showPermissions ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                <Shield size={16} />
+                Permissions
+              </button>
+            )}
+          </div>
           <div className="flex space-x-2">
             <button
               onClick={() => setViewType('list')}
@@ -292,6 +348,99 @@ const FoldersTab = () => {
             </button>
           </div>
         </div>
+
+        {/* Permissions Panel */}
+        {showPermissions && currentFolderId && (
+          <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-4">
+            <h3 className="text-lg font-bold text-purple-800">
+              Folder Permissions {permLoading && <span className="text-sm font-normal text-purple-500">(loading...)</span>}
+            </h3>
+
+            {/* Current user permissions */}
+            {currentUser && (
+              <div>
+                <h4 className="text-sm font-semibold text-purple-700 mb-2">
+                  Your permissions ({currentUser.name}):
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(permissions).map(([perm, allowed]) => (
+                    <span
+                      key={perm}
+                      className={`px-2 py-1 rounded text-xs font-medium ${
+                        allowed
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {perm.replace('_effective', '').replace('can_', '')}:{' '}
+                      {allowed ? 'Yes' : 'No'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Role assignments */}
+            <div>
+              <h4 className="text-sm font-semibold text-purple-700 mb-2">Role assignments:</h4>
+              {assignments.length === 0 ? (
+                <p className="text-sm text-purple-500">No roles assigned yet</p>
+              ) : (
+                <ul className="space-y-1">
+                  {assignments.map((a, i) => (
+                    <li key={i} className="flex items-center justify-between text-sm bg-white p-2 rounded">
+                      <span>
+                        <span className="font-medium">{a.user}</span>
+                        {' '}is{' '}
+                        <span className="font-semibold text-purple-700">{a.relation}</span>
+                      </span>
+                      <button
+                        onClick={() => handleRemoveRole(a.user, a.relation)}
+                        className="text-red-500 hover:text-red-700 text-xs px-2 py-1"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Assign new role */}
+            <div>
+              <h4 className="text-sm font-semibold text-purple-700 mb-2">Assign role:</h4>
+              <div className="flex items-end gap-2">
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="border border-purple-300 p-2 rounded-lg text-sm flex-grow"
+                >
+                  <option value="">Select User</option>
+                  {orgUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="border border-purple-300 p-2 rounded-lg text-sm"
+                >
+                  <option value="manager">Manager</option>
+                  <option value="editor">Editor</option>
+                  <option value="creator">Creator</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+                <button
+                  onClick={handleAssignRole}
+                  disabled={!selectedUserId}
+                  className="px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition disabled:opacity-50 text-sm"
+                >
+                  Assign
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {folderContent && (
           <>
@@ -312,6 +461,7 @@ const FoldersTab = () => {
               viewType={viewType}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              permissions={currentFolderId ? permissions : undefined}
             />
 
             {currentFolderId && (

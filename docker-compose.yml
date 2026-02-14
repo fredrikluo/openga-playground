@@ -27,6 +27,8 @@ services:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/kahoot.db
       - OPENFGA_API_URL=http://openfga:8080
+      - OPENFGA_STORE_ID=${OPENFGA_STORE_ID:-}
+      - OPENFGA_MODEL_ID=${OPENFGA_MODEL_ID:-}
     depends_on:
       - openfga
     networks:

@@ -1,7 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll } from '@/lib/db';
-import type { Organization } from '@/lib/schema';
+import db, { getAll, getOne } from '@/lib/db';
+import type { Organization, Folder } from '@/lib/schema';
 import { addUserToOrganization } from '@/lib/user-organization-helpers';
+import { writeOrgMemberTuple, writeFolderTuples } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,6 +64,20 @@ export async function POST(request: Request) {
 
     // Add user to organization (creates personal folder)
     addUserToOrganization(userId, newOrg.id, userRole);
+
+    // Sync OpenFGA tuples: org membership + folder hierarchy
+    const orgId = newOrg.id;
+    await writeOrgMemberTuple(userId, orgId);
+    // Hidden root folder
+    await writeFolderTuples(newOrg.root_folder_id, orgId, null);
+    // Shared folder + personal folder created by addUserToOrganization
+    const childFolders = getAll<Folder>(
+      'SELECT * FROM folders WHERE parent_folder_id = ? AND organization_id = ?',
+      newOrg.root_folder_id, orgId
+    );
+    for (const folder of childFolders) {
+      await writeFolderTuples(folder.id, orgId, newOrg.root_folder_id);
+    }
 
     return NextResponse.json(newOrg, { status: 201 });
   } catch (error) {

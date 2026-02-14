@@ -14,6 +14,13 @@ interface SubFolder {
   organization_id?: number;
 }
 
+interface FolderPermissions {
+  can_edit_effective?: boolean;
+  can_remove_effective?: boolean;
+  can_create_effective?: boolean;
+  [key: string]: boolean | undefined;
+}
+
 interface FolderViewProps {
   folders: SubFolder[];
   kahoots: Kahoot[];
@@ -23,6 +30,7 @@ interface FolderViewProps {
   viewType: 'grid' | 'list';
   onEdit: (folder: SubFolder) => void;
   onDelete: (folderId: number) => void;
+  permissions?: FolderPermissions;
 }
 
 export default function FolderView({
@@ -34,7 +42,10 @@ export default function FolderView({
   viewType,
   onEdit,
   onDelete,
+  permissions,
 }: FolderViewProps) {
+  const canEdit = permissions?.can_edit_effective !== false;
+  const canRemove = permissions?.can_remove_effective !== false;
   return (
     <div className="min-h-[300px] overflow-y-auto">
       <div className="flex items-center mb-4">
@@ -60,7 +71,9 @@ export default function FolderView({
             >
               <Folder size={52} className="text-blue-500" />
               <span className="mt-3 text-md font-medium text-center text-gray-700">{folder.name}</span>
+              {(canEdit || canRemove) && (
               <div className="absolute top-1 right-1 flex">
+                {canEdit && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onEdit(folder); }}
                   className="p-1 rounded-full hover:bg-gray-200"
@@ -68,6 +81,8 @@ export default function FolderView({
                 >
                   <Pencil size={16} className="text-gray-600" />
                 </button>
+                )}
+                {canRemove && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete(folder.id); }}
                   className="p-1 rounded-full hover:bg-gray-200"
@@ -75,7 +90,9 @@ export default function FolderView({
                 >
                   <Trash2 size={16} className="text-gray-600" />
                 </button>
+                )}
               </div>
+              )}
             </div>
           ))}
           {kahoots.map((kahoot) => (
@@ -98,7 +115,9 @@ export default function FolderView({
             >
               <Folder size={24} className="mr-4 text-blue-500" />
               <span className="text-lg font-medium text-gray-800 flex-grow">{folder.name}</span>
+              {(canEdit || canRemove) && (
               <div className="flex space-x-2">
+                {canEdit && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onEdit(folder); }}
                   className="p-2 rounded-full hover:bg-gray-200"
@@ -106,6 +125,8 @@ export default function FolderView({
                 >
                   <Pencil size={16} />
                 </button>
+                )}
+                {canRemove && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete(folder.id); }}
                   className="p-2 rounded-full hover:bg-gray-200"
@@ -113,7 +134,9 @@ export default function FolderView({
                 >
                   <Trash2 size={16} />
                 </button>
+                )}
               </div>
+              )}
             </li>
           ))}
           {kahoots.map((kahoot) => (

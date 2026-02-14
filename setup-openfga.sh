@@ -31,14 +31,25 @@ echo "Created store with ID: $STORE_ID"
 # Convert the FGA model to JSON and upload it
 MODEL_JSON=$(fga model transform --file openfga/model.fga)
 
-curl -X POST "http://localhost:8080/stores/$STORE_ID/authorization-models" \
+MODEL_RESPONSE=$(curl -s -X POST "http://localhost:8080/stores/$STORE_ID/authorization-models" \
   -H "Content-Type: application/json" \
-  -d "$MODEL_JSON"
+  -d "$MODEL_JSON")
+
+MODEL_ID=$(echo "$MODEL_RESPONSE" | jq -r '.authorization_model_id')
+
+echo "$MODEL_ID" > .model_id
 
 echo ""
-echo "✅ OpenFGA setup completed!"
-echo "🌐 OpenFGA Playground: http://localhost:3001"
-echo "🔧 OpenFGA API: http://localhost:8080"
-echo "📁 Store ID: $STORE_ID (saved to .store_id)"
+echo "OpenFGA setup completed!"
+echo "OpenFGA Playground: http://localhost:3001"
+echo "OpenFGA API: http://localhost:8080"
+echo "Store ID: $STORE_ID (saved to .store_id)"
+echo "Model ID: $MODEL_ID (saved to .model_id)"
 echo ""
 echo "Your authorization model has been uploaded to OpenFGA."
+echo ""
+echo "Optional: set these in your .env or docker-compose.yml:"
+echo "  OPENFGA_STORE_ID=$STORE_ID"
+echo "  OPENFGA_MODEL_ID=$MODEL_ID"
+echo ""
+echo "Note: The app auto-discovers the store by name if these are not set."

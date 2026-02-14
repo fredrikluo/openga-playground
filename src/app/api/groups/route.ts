@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import db, { getAll } from '@/lib/db';
 import type { Group } from '@/lib/schema';
+import { writeGroupTuples } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
     });
 
     const newGroup = transaction();
+
+    // Sync OpenFGA: group org + member tuples
+    await writeGroupTuples(newGroup.id, organization_id, user_ids || []);
 
     return NextResponse.json(newGroup, { status: 201 });
   } catch (error) {

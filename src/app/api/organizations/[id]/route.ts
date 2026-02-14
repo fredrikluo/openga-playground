@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import db, { getOne } from '@/lib/db';
+import db, { getOne, getAll } from '@/lib/db';
 import type { Organization } from '@/lib/schema';
+import { deleteOrgMemberTuple } from '@/lib/openfga-tuples';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -38,6 +39,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+
+    // Collect org members before deletion for tuple cleanup
+    const orgMembers = getAll<{ user_id: number }>(
+      'SELECT user_id FROM user_organizations WHERE organization_id = ?', id
+    );
 
     const transaction = db.transaction(() => {
       const org = getOne<Organization>('SELECT * FROM organizations WHERE id = ?', id);
@@ -78,6 +84,12 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     if (info.changes === 0) {
       return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
     }
+
+    // Clean up org member tuples in OpenFGA
+    for (const member of orgMembers) {
+      await deleteOrgMemberTuple(member.user_id, id);
+    }
+
     return NextResponse.json({ message: 'Organization deleted successfully' });
   } catch (error) {
     console.error(error);

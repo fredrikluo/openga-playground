@@ -1,7 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import db, { getOne } from '@/lib/db';
-import type { User } from '@/lib/schema';
+import type { User, Organization, Folder } from '@/lib/schema';
 import { addUserToOrganization, removeUserFromOrganization } from '@/lib/user-organization-helpers';
+import { writeOrgMemberTuple, deleteOrgMemberTuple, writeFolderTuples } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -33,18 +34,33 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (action === 'add_to_org' && organization_id) {
       try {
         addUserToOrganization(id, organization_id, role || 'member');
-        return NextResponse.json({ message: 'User added to organization' });
       } catch (orgError: unknown) {
         if (orgError instanceof Error && orgError.message.includes('A user with this name already exists')) {
           return NextResponse.json({ message: orgError.message }, { status: 409 });
         }
         throw orgError;
       }
+
+      // Sync OpenFGA: org membership + personal folder tuple
+      await writeOrgMemberTuple(id, organization_id);
+      const org = getOne<Organization>('SELECT root_folder_id FROM organizations WHERE id = ?', organization_id);
+      if (org) {
+        const personalFolder = getOne<Folder>(
+          'SELECT * FROM folders WHERE name = ? AND parent_folder_id = ? AND organization_id = ?',
+          targetUser.name, org.root_folder_id, organization_id
+        );
+        if (personalFolder) {
+          await writeFolderTuples(personalFolder.id, organization_id, org.root_folder_id);
+        }
+      }
+
+      return NextResponse.json({ message: 'User added to organization' });
     }
 
     // Remove user from organization
     if (action === 'remove_from_org' && organization_id) {
       removeUserFromOrganization(id, organization_id);
+      await deleteOrgMemberTuple(id, organization_id);
       return NextResponse.json({ message: 'User removed from organization' });
     }
 
@@ -112,6 +128,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     // Remove user from all organizations (this deletes their personal folders)
     for (const org of userOrgs) {
       removeUserFromOrganization(id, org.organization_id);
+      await deleteOrgMemberTuple(id, org.organization_id);
     }
 
     // Now delete the user
