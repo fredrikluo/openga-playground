@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import db, { getOne, getAll } from '@/lib/db';
 import type { Organization } from '@/lib/schema';
-import { deleteOrgMemberTuple } from '@/lib/openfga-tuples';
+import { syncOrgDeleted } from '@/lib/openfga-tuples';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -40,7 +40,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { id } = await context.params;
 
-    // Collect org members before deletion for tuple cleanup
     const orgMembers = getAll<{ user_id: number }>(
       'SELECT user_id FROM user_organizations WHERE organization_id = ?', id
     );
@@ -51,44 +50,22 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
         return { changes: 0 };
       }
 
-      // Delete in proper order to avoid foreign key constraints:
-      // Note: There's a circular reference between organizations.root_folder_id and folders.organization_id
-
-      // 1. Delete all kahoots in folders belonging to this organization
       db.prepare(`
-        DELETE FROM kahoots
-        WHERE folder_id IN (
-          SELECT id FROM folders WHERE organization_id = ?
-        )
+        DELETE FROM kahoots WHERE folder_id IN (SELECT id FROM folders WHERE organization_id = ?)
       `).run(id);
-
-      // 2. Break the circular reference by setting root_folder_id to NULL
       db.prepare('UPDATE organizations SET root_folder_id = NULL WHERE id = ?').run(id);
-
-      // 3. Delete all folders belonging to this organization (now safe)
       db.prepare('DELETE FROM folders WHERE organization_id = ?').run(id);
-
-      // 4. Delete all groups belonging to this organization
       db.prepare('DELETE FROM groups WHERE organization_id = ?').run(id);
-
-      // 5. user_organizations will auto-delete due to ON DELETE CASCADE
-
-      // 6. Finally delete the organization
       const info = db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
-
       return info;
     });
 
     const info = transaction();
-
     if (info.changes === 0) {
       return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
     }
 
-    // Clean up org member tuples in OpenFGA
-    for (const member of orgMembers) {
-      await deleteOrgMemberTuple(member.user_id, Number(id));
-    }
+    await syncOrgDeleted(Number(id), orgMembers.map(m => m.user_id));
 
     return NextResponse.json({ message: 'Organization deleted successfully' });
   } catch (error) {

@@ -27,7 +27,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
     }
 
-    // If parent_folder_id is provided, inherit organization_id from parent
     let orgId = organization_id;
     if (parent_folder_id) {
       const parentFolder = getOne<Folder>('SELECT organization_id FROM folders WHERE id = ?', parent_folder_id);
@@ -43,7 +42,6 @@ export async function POST(request: Request) {
     const stmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, ?, ?)');
     const info = stmt.run(name, parent_folder_id, orgId);
 
-    // Sync OpenFGA: folder in_org + parent tuples
     await writeFolderTuples(info.lastInsertRowid, orgId, parent_folder_id || null);
 
     return NextResponse.json({ id: info.lastInsertRowid, name, parent_folder_id, organization_id: orgId }, { status: 201 });

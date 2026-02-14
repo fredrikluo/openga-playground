@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import db, { getOne } from '@/lib/db';
-import type { User, Organization, Folder } from '@/lib/schema';
+import type { User } from '@/lib/schema';
 import { addUserToOrganization, removeUserFromOrganization } from '@/lib/user-organization-helpers';
-import { writeOrgMemberTuple, deleteOrgMemberTuple, writeFolderTuples } from '@/lib/openfga-tuples';
+import { syncUserAddedToOrg, syncUserRemovedFromOrg } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -41,26 +41,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         throw orgError;
       }
 
-      // Sync OpenFGA: org membership + personal folder tuple
-      await writeOrgMemberTuple(Number(id), organization_id);
-      const org = getOne<Organization>('SELECT root_folder_id FROM organizations WHERE id = ?', organization_id);
-      if (org) {
-        const personalFolder = getOne<Folder>(
-          'SELECT * FROM folders WHERE name = ? AND parent_folder_id = ? AND organization_id = ?',
-          targetUser.name, org.root_folder_id, organization_id
-        );
-        if (personalFolder) {
-          await writeFolderTuples(personalFolder.id, organization_id, org.root_folder_id);
-        }
-      }
-
+      await syncUserAddedToOrg(Number(id), organization_id, targetUser.name);
       return NextResponse.json({ message: 'User added to organization' });
     }
 
     // Remove user from organization
     if (action === 'remove_from_org' && organization_id) {
       removeUserFromOrganization(Number(id), organization_id);
-      await deleteOrgMemberTuple(Number(id), organization_id);
+      await syncUserRemovedFromOrg(Number(id), organization_id);
       return NextResponse.json({ message: 'User removed from organization' });
     }
 
@@ -114,24 +102,20 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     const { id } = await context.params;
 
-    // Check if user exists
     const user = getOne<User>('SELECT * FROM users WHERE id = ?', id);
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    // Get all organizations the user belongs to
     const userOrgs = db.prepare(`
       SELECT organization_id FROM user_organizations WHERE user_id = ?
     `).all(id) as { organization_id: number }[];
 
-    // Remove user from all organizations (this deletes their personal folders)
     for (const org of userOrgs) {
       removeUserFromOrganization(Number(id), org.organization_id);
-      await deleteOrgMemberTuple(Number(id), org.organization_id);
+      await syncUserRemovedFromOrg(Number(id), org.organization_id);
     }
 
-    // Now delete the user
     const stmt = db.prepare('DELETE FROM users WHERE id = ?');
     stmt.run(id);
 

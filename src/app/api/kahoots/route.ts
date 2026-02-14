@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import db, { getAll, getOne } from '@/lib/db';
-import type { Kahoot, Folder } from '@/lib/schema';
-import { writeDocumentTuples } from '@/lib/openfga-tuples';
+import db, { getAll } from '@/lib/db';
+import type { Kahoot } from '@/lib/schema';
+import { syncKahootCreated } from '@/lib/openfga-tuples';
 
 export async function GET() {
   try {
@@ -22,11 +22,7 @@ export async function POST(request: Request) {
     const stmt = db.prepare('INSERT INTO kahoots (name, folder_id) VALUES (?, ?)');
     const info = stmt.run(name, folder_id);
 
-    // Sync OpenFGA: document parent + in_org tuples
-    const parentFolder = getOne<Folder>('SELECT organization_id FROM folders WHERE id = ?', folder_id);
-    if (parentFolder) {
-      await writeDocumentTuples(info.lastInsertRowid, folder_id, parentFolder.organization_id);
-    }
+    await syncKahootCreated(info.lastInsertRowid, folder_id);
 
     return NextResponse.json({ id: info.lastInsertRowid, name, folder_id }, { status: 201 });
   } catch (error) {

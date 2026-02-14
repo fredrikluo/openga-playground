@@ -44,8 +44,6 @@ export async function POST(request: Request) {
     });
 
     const newGroup = transaction();
-
-    // Sync OpenFGA: group org + member tuples
     await writeGroupTuples(newGroup.id, organization_id, user_ids || []);
 
     return NextResponse.json(newGroup, { status: 201 });

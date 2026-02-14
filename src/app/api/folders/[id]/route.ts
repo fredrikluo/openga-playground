@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import db, { getOne, getAll } from '@/lib/db';
 import type { Folder, Kahoot } from '@/lib/schema';
-import { updateFolderParentTuple } from '@/lib/openfga-tuples';
+import { syncFolderMoved } from '@/lib/openfga-tuples';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -27,7 +27,6 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
     }
 
-    // Get old folder data to detect parent change
     const oldFolder = getOne<Folder>('SELECT * FROM folders WHERE id = ?', id);
 
     const stmt = db.prepare('UPDATE folders SET name = ?, parent_folder_id = ? WHERE id = ?');
@@ -36,9 +35,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
     }
 
-    // Sync OpenFGA: update parent tuple if folder was moved
-    if (oldFolder && oldFolder.parent_folder_id !== parent_folder_id) {
-      await updateFolderParentTuple(Number(id), oldFolder.parent_folder_id, parent_folder_id ?? null);
+    if (oldFolder) {
+      await syncFolderMoved(Number(id), oldFolder.parent_folder_id, parent_folder_id ?? null);
     }
 
     return NextResponse.json({ id, name, parent_folder_id });
