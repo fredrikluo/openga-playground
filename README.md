@@ -7,28 +7,58 @@ A playground app for testing fine-grained authorization with [OpenFGA](https://o
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | App | Next.js 15 + React 19 | UI and API routes |
-| App DB | SQLite (better-sqlite3) | Application data (users, orgs, folders, kahoots) |
+| App DB | PostgreSQL 17 | Application data (users, orgs, folders, kahoots) |
 | Auth | OpenFGA | Fine-grained authorization (permission checks, role assignments) |
-| FGA DB | PostgreSQL 17 | OpenFGA's datastore |
+| FGA DB | PostgreSQL 17 (shared instance) | OpenFGA's datastore |
 
-All services run in Docker via `docker-compose`.
+All services run in Docker via docker-compose.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - `curl` and `jq` (for the setup script)
+- GNU Make (optional, for shorthand commands)
 
 ## Quick Start
 
+### Development (hot reload)
+
 ```bash
-# 1. Start all services
-docker compose up -d --build
-
-# 2. Upload the authorization model to OpenFGA
-./setup-openfga.sh
-
-# 3. Open the app
+make dev
 open http://localhost:3000
+```
+
+Your source code is mounted into the container — any file change is reflected immediately via Next.js hot reload.
+
+### Production
+
+```bash
+make prod
+open http://localhost:3000
+```
+
+Everything is fully automatic — on first request, the app creates the OpenFGA store and uploads the authorization model if they don't exist yet. No manual setup step needed.
+
+### All Make commands
+
+```bash
+make dev      # Start dev environment with hot reload
+make prod     # Build and start production environment
+make setup    # Re-upload OpenFGA model (after editing model.fga)
+make down     # Stop all services
+make clean    # Stop all services and delete all data
+make logs     # Tail logs from all services
+make help     # Show all available commands
+```
+
+### Without Make
+
+```bash
+# Development
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Production
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 The startup order is automatic: PostgreSQL starts first, then OpenFGA runs its database migration, then the OpenFGA server starts, and finally the app starts.
@@ -37,9 +67,9 @@ The startup order is automatic: PostgreSQL starts first, then OpenFGA runs its d
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| App | http://localhost:3000 | Main application |
-| OpenFGA API | http://localhost:8080 | OpenFGA HTTP API |
-| OpenFGA Playground | http://localhost:3001 | Visual tool for exploring the FGA model |
+| App | <http://localhost:3000> | Main application |
+| OpenFGA API | <http://localhost:8080> | OpenFGA HTTP API |
+| OpenFGA Playground | <http://localhost:3001> | Visual tool for exploring the FGA model |
 | OpenFGA gRPC | localhost:8081 | gRPC endpoint |
 
 ## How It Works
@@ -67,7 +97,7 @@ When you create, update, or delete entities through the app, the corresponding O
 - Creating a folder writes its `parent` and `in_org` tuples
 - Creating a kahoot writes its `parent` (folder) and `in_org` tuples
 
-The sync functions live in `src/lib/openfga-tuples.ts`. The database (SQLite) is the source of truth; if a tuple write fails, the app logs the error but doesn't roll back the DB operation.
+The sync functions live in `src/lib/openfga-tuples.ts`. The database (PostgreSQL) is the source of truth; if a tuple write fails, the app logs the error but doesn't roll back the DB operation.
 
 ### Testing Permissions
 
@@ -82,7 +112,7 @@ The sync functions live in `src/lib/openfga-tuples.ts`. The database (SQLite) is
 
 ## Project Structure
 
-```
+```text
 src/
   app/
     api/
@@ -99,41 +129,49 @@ src/
   context/                 # UserContext, OrganizationContext
   hooks/                   # usePermissions, useRoleAssignments
   lib/
-    db.ts                  # SQLite schema + generateId() helper
+    db/                    # Database abstraction (PostgreSQL)
+      types.ts             # Database interface
+      postgres.ts          # PostgreSQL implementation
+      schema.ts            # CREATE TABLE statements
+      index.ts             # Connection + generateId()
+    repositories/          # Data access layer
+      userRepository.ts
+      organizationRepository.ts
+      groupRepository.ts
+      folderRepository.ts
+      kahootRepository.ts
+      userOrganizationRepository.ts
     schema.ts              # TypeScript interfaces
-    openfga.ts             # OpenFGA client singleton (auto-discovers store)
-    openfga-tuples.ts      # Low-level tuple helpers + high-level sync functions
+    openfga.ts             # OpenFGA client singleton
+    openfga-tuples.ts      # Tuple sync functions
     user-organization-helpers.ts
 openfga/
   model.fga                # Authorization model (source of truth)
-docker-compose.yml
+docker-compose.yml         # Shared infrastructure (postgres, openfga)
+docker-compose.dev.yml     # Dev: mounts source, hot reload
+docker-compose.prod.yml    # Prod: builds Docker image
 Dockerfile
+Makefile
 setup-openfga.sh           # Creates store + uploads model
 ```
 
 ## Updating the Authorization Model
 
-Edit `openfga/model.fga`, then re-run the setup script:
+The model is defined in two places that must be kept in sync:
 
-```bash
-./setup-openfga.sh
-docker compose restart app
-```
+- `openfga/model.fga` — human-readable DSL (source of truth for documentation)
+- `src/lib/openfga-model.ts` — JSON format used by the app for auto-upload
 
-The setup script uses the `openfga/cli` Docker image to transform the `.fga` DSL to JSON on the fly, so no local FGA CLI installation is needed.
+After editing the model, either:
+
+1. Update `src/lib/openfga-model.ts` to match, then restart the app
+2. Or run `make setup` which transforms `model.fga` to JSON and uploads it directly via the OpenFGA API (uses the `openfga/cli` Docker image, no local CLI needed)
 
 ## Resetting Data
 
 ```bash
-# Stop everything
-docker compose down
-
-# Delete app database and OpenFGA data
-rm -rf data/
-
-# Rebuild and start
-docker compose up -d --build
-./setup-openfga.sh
+make clean
+make dev    # or: make prod
 ```
 
 ## Permission API Examples

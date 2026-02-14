@@ -73,10 +73,10 @@ async function initDb() {
     const rootFolderId = generateId();
     const userId = generateId();
 
-    await db.run('INSERT INTO organizations (id, name) VALUES (?, ?)', orgId, 'Default Organization');
-    await db.run('INSERT INTO folders (id, name, organization_id) VALUES (?, ?, ?)', rootFolderId, 'Default Root Folder', orgId);
-    await db.run('UPDATE organizations SET root_folder_id = ? WHERE id = ?', rootFolderId, orgId);
-    await db.run('INSERT INTO users (id, name, email, organization_id, role) VALUES (?, ?, ?, ?, ?)', userId, 'Default User', 'user@example.com', orgId, 'admin');
+    await db.run('INSERT INTO organizations (id, name) VALUES ($1, $2)', orgId, 'Default Organization');
+    await db.run('INSERT INTO folders (id, name, organization_id) VALUES ($1, $2, $3)', rootFolderId, 'Default Root Folder', orgId);
+    await db.run('UPDATE organizations SET root_folder_id = $1 WHERE id = $2', rootFolderId, orgId);
+    await db.run('INSERT INTO users (id, name, email, organization_id, role) VALUES ($1, $2, $3, $4, $5)', userId, 'Default User', 'user@example.com', orgId, 'admin');
 
     console.log('Default data created successfully.');
   } catch (e) {

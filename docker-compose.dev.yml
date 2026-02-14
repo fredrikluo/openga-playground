@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://openfga:openfga@postgres:5432/kahoot?sslmode=disable
+      - OPENFGA_API_URL=http://openfga:8080
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./openfga:/app/openfga
+      - ./next.config.ts:/app/next.config.ts
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./postcss.config.mjs:/app/postcss.config.mjs
+    depends_on:
+      openfga:
+        condition: service_started
+    networks:
+      - app-network

@@ -1,4 +1,5 @@
 import { OpenFgaClient, TupleKey, TupleKeyWithoutCondition, ConsistencyPreference } from '@openfga/sdk';
+import { AUTHORIZATION_MODEL } from './openfga-model';
 
 const STORE_NAME = 'kahoot-manager';
 
@@ -6,8 +7,32 @@ let fgaClient: OpenFgaClient | null = null;
 let initialized = false;
 
 /**
+ * Ensure the store has an authorization model. Uploads one if none exists.
+ */
+async function ensureModel(client: OpenFgaClient): Promise<void> {
+  try {
+    const modelResp = await client.readLatestAuthorizationModel();
+    if (modelResp.authorization_model?.id) {
+      client.authorizationModelId = modelResp.authorization_model.id;
+      return;
+    }
+  } catch {
+    // No model found — upload one
+  }
+
+  try {
+    console.log('OpenFGA: Uploading authorization model...');
+    const resp = await client.writeAuthorizationModel(AUTHORIZATION_MODEL);
+    client.authorizationModelId = resp.authorization_model_id;
+    console.log(`OpenFGA: Model uploaded (${resp.authorization_model_id})`);
+  } catch (error) {
+    console.error('OpenFGA: Failed to upload authorization model:', error);
+  }
+}
+
+/**
  * Get or create the OpenFGA client singleton.
- * Auto-discovers the store by name if OPENFGA_STORE_ID is not set.
+ * Auto-discovers store by name, creates if missing, uploads model if needed.
  */
 export async function getClient(): Promise<OpenFgaClient> {
   if (fgaClient && initialized) {
@@ -20,22 +45,14 @@ export async function getClient(): Promise<OpenFgaClient> {
 
   if (storeId) {
     fgaClient = new OpenFgaClient({ apiUrl, storeId, authorizationModelId: modelId || undefined });
-    // If we have a store ID but no model ID, discover it
     if (!modelId) {
-      try {
-        const modelResp = await fgaClient.readLatestAuthorizationModel();
-        if (modelResp.authorization_model?.id) {
-          fgaClient.authorizationModelId = modelResp.authorization_model.id;
-        }
-      } catch (e) {
-        console.warn('Could not read latest authorization model:', e);
-      }
+      await ensureModel(fgaClient);
     }
     initialized = true;
     return fgaClient;
   }
 
-  // Auto-discover: list stores to find one named "kahoot-manager"
+  // Auto-discover or create store
   const tempClient = new OpenFgaClient({ apiUrl });
   try {
     const stores = await tempClient.listStores();
@@ -43,40 +60,27 @@ export async function getClient(): Promise<OpenFgaClient> {
 
     if (existing) {
       fgaClient = new OpenFgaClient({ apiUrl, storeId: existing.id! });
-      // Discover latest model ID
-      try {
-        const modelResp = await fgaClient.readLatestAuthorizationModel();
-        if (modelResp.authorization_model?.id) {
-          fgaClient.authorizationModelId = modelResp.authorization_model.id;
-        }
-      } catch (e) {
-        console.warn('Could not read latest authorization model:', e);
-      }
+      await ensureModel(fgaClient);
       initialized = true;
-      console.log(`OpenFGA: using existing store "${STORE_NAME}" (${existing.id})`);
+      console.log(`OpenFGA: using store "${STORE_NAME}" (${existing.id})`);
       return fgaClient;
     }
 
-    // No store found — create one
+    // Create store + upload model
     const newStore = await tempClient.createStore({ name: STORE_NAME });
     fgaClient = new OpenFgaClient({ apiUrl, storeId: newStore.id! });
+    await ensureModel(fgaClient);
     initialized = true;
-    console.log(`OpenFGA: created new store "${STORE_NAME}" (${newStore.id})`);
-    console.warn('OpenFGA: No authorization model uploaded yet. Run setup-openfga.sh to upload the model.');
+    console.log(`OpenFGA: created store "${STORE_NAME}" (${newStore.id})`);
     return fgaClient;
   } catch (error) {
-    console.error('OpenFGA: Failed to auto-discover store. Is OpenFGA running?', error);
-    // Return a client without store ID — operations will fail but app won't crash
+    console.error('OpenFGA: Failed to initialize. Is OpenFGA running?', error);
     fgaClient = new OpenFgaClient({ apiUrl });
     initialized = true;
     return fgaClient;
   }
 }
 
-/**
- * Write relationship tuples to OpenFGA.
- * Logs errors but does not throw (DB is source of truth).
- */
 export async function writeTuples(tuples: TupleKey[]): Promise<void> {
   if (tuples.length === 0) return;
   try {
@@ -87,10 +91,6 @@ export async function writeTuples(tuples: TupleKey[]): Promise<void> {
   }
 }
 
-/**
- * Delete relationship tuples from OpenFGA.
- * Logs errors but does not throw (DB is source of truth).
- */
 export async function deleteTuples(tuples: TupleKeyWithoutCondition[]): Promise<void> {
   if (tuples.length === 0) return;
   try {
@@ -101,9 +101,6 @@ export async function deleteTuples(tuples: TupleKeyWithoutCondition[]): Promise<
   }
 }
 
-/**
- * Check if a user has a particular relation with an object.
- */
 export async function check(
   user: string,
   relation: string,
@@ -125,9 +122,6 @@ export async function check(
   }
 }
 
-/**
- * Read tuples matching a filter from OpenFGA.
- */
 export async function readTuples(filter: {
   user?: string;
   relation?: string;
