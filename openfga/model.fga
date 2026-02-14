@@ -27,8 +27,8 @@ type folder
     # Direct role assignments on THIS folder
     define manager: [user, group#member]
     define editor:  [user, group#member]
-    define creator: [user, group#member]  # NOTE: NOT inherited
-    define viewer:  [user, group#member]
+    define creator: [user, group#member, organization#member]  # NOT inherited
+    define viewer:  [user, group#member, organization#member]
 
     # Inherited roles (creator is intentionally NOT inherited)
     define manager_inherited: manager or manager_inherited from parent
@@ -73,8 +73,8 @@ type document
     # Direct role assignments on THIS document (exceptions)
     define manager: [user, group#member]
     define editor:  [user, group#member]
-    define creator: [user, group#member]  # NOTE: NOT inherited
-    define viewer:  [user, group#member]
+    define creator: [user, group#member, organization#member]  # NOT inherited
+    define viewer:  [user, group#member, organization#member]
 
     # Direct share to a specific user
     define shared_with: [user]

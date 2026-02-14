@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useOrganization } from '@/context/OrganizationContext';
+import { apiHeaders, getHeaders } from '@/lib/api';
 
 interface Organization {
   id: string;
@@ -34,27 +35,27 @@ const OrganizationsTab = () => {
   const [selectedOrgToJoin, setSelectedOrgToJoin] = useState<string>('');
 
   const fetchAllUsers = async () => {
-    const res = await fetch('/api/users');
+    const res = await fetch('/api/users', { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setAllUsers(data);
   };
 
   const fetchAllOrganizations = async () => {
-    const res = await fetch('/api/organizations');
+    const res = await fetch('/api/organizations', { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setAllOrganizations(data);
   };
 
   const fetchOrgUsers = useCallback(async (organizationId: string) => {
     if (!currentUser) return;
-    const res = await fetch(`/api/users?organizationId=${organizationId}`);
+    const res = await fetch(`/api/users?organizationId=${organizationId}`, { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setUsersByOrg((prev) => ({ ...prev, [organizationId]: data }));
   }, [currentUser]);
 
   const fetchOrganizations = useCallback(async () => {
     if (currentUser) {
-      const res = await fetch(`/api/organizations?userId=${currentUser.id}`);
+      const res = await fetch(`/api/organizations?userId=${currentUser.id}`, { headers: getHeaders(currentUser?.id) });
       const data = await res.json();
       setOrganizations(data);
       data.forEach((org: Organization) => fetchOrgUsers(org.id));
@@ -75,7 +76,7 @@ const OrganizationsTab = () => {
     if (currentUser) {
       const res = await fetch('/api/organizations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(currentUser?.id),
         body: JSON.stringify({ name: newOrganizationName, userId: currentUser.id }),
       });
 
@@ -87,7 +88,7 @@ const OrganizationsTab = () => {
         refetchUsers();
 
         // Update global organizations list and set as current
-        const userOrgsRes = await fetch(`/api/users/${currentUser.id}/organizations`);
+        const userOrgsRes = await fetch(`/api/users/${currentUser.id}/organizations`, { headers: getHeaders(currentUser?.id) });
         const userOrgs = await userOrgsRes.json();
         setGlobalOrganizations(userOrgs);
 
@@ -104,7 +105,7 @@ const OrganizationsTab = () => {
     if (!editName.trim()) return;
     await fetch(`/api/organizations/${org.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({ name: editName }),
     });
     setEditingOrgId(null);
@@ -113,7 +114,7 @@ const OrganizationsTab = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/organizations/${id}`, { method: 'DELETE' });
+    await fetch(`/api/organizations/${id}`, { method: 'DELETE', headers: getHeaders(currentUser?.id) });
 
     // If current user deleted their currently selected org, switch to another org
     if (currentUser && currentOrganization?.id === id) {
@@ -122,7 +123,7 @@ const OrganizationsTab = () => {
       setCurrentOrganization(updatedOrgs.length > 0 ? updatedOrgs[0] : null);
     } else if (currentUser) {
       // Update global organizations list even if not current org
-      const res = await fetch(`/api/users/${currentUser.id}/organizations`);
+      const res = await fetch(`/api/users/${currentUser.id}/organizations`, { headers: getHeaders(currentUser?.id) });
       const userOrgs = await res.json();
       setGlobalOrganizations(userOrgs);
     }
@@ -135,7 +136,7 @@ const OrganizationsTab = () => {
     if (!currentUser) return;
     await fetch(`/api/users/${userId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({ role, organization_id: organizationId }),
     });
     fetchOrgUsers(organizationId);
@@ -145,7 +146,7 @@ const OrganizationsTab = () => {
     if (!selectedUser || !currentUser) return;
     const res = await fetch(`/api/users/${selectedUser}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({
         action: 'add_to_org',
         organization_id: organizationId,
@@ -170,7 +171,7 @@ const OrganizationsTab = () => {
     if (!currentUser) return;
     await fetch(`/api/users/${userId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({
         action: 'remove_from_org',
         organization_id: organizationId
@@ -194,7 +195,7 @@ const OrganizationsTab = () => {
     if (!selectedOrgToJoin || !currentUser) return;
     const res = await fetch(`/api/users/${currentUser.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({
         action: 'add_to_org',
         organization_id: selectedOrgToJoin,
@@ -213,7 +214,7 @@ const OrganizationsTab = () => {
     fetchAllOrganizations();
 
     // Update global organizations list
-    const userOrgsRes = await fetch(`/api/users/${currentUser.id}/organizations`);
+    const userOrgsRes = await fetch(`/api/users/${currentUser.id}/organizations`, { headers: getHeaders(currentUser?.id) });
     const userOrgs = await userOrgsRes.json();
     setGlobalOrganizations(userOrgs);
   };

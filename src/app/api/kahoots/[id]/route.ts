@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { kahootRepository } from '@/lib/repositories';
 import { syncKahootUpdated, syncKahootDeleted } from '@/lib/openfga-tuples';
+import { check } from '@/lib/openfga';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -42,9 +44,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+    const userId = getCurrentUserId(request);
 
     const kahoot = await kahootRepository.getById(id);
 
@@ -52,9 +55,16 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       return NextResponse.json({ message: 'Kahoot not found' }, { status: 404 });
     }
 
+    if (userId) {
+      const allowed = await check(`user:${userId}`, 'can_remove_effective', `document:${id}`);
+      if (!allowed) {
+        return NextResponse.json({ message: 'Permission denied: cannot delete this document' }, { status: 403 });
+      }
+    }
+
     await kahootRepository.delete(id);
 
-    await syncKahootDeleted(id, kahoot.folder_id);
+    await syncKahootDeleted(id);
 
     return NextResponse.json({ message: 'Kahoot deleted successfully' });
   } catch (error) {

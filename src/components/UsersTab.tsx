@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
+import { apiHeaders, getHeaders } from '@/lib/api';
 
 interface User {
   id: string;
@@ -9,37 +10,22 @@ interface User {
   email: string;
 }
 
-interface Organization {
-  id: string;
-  name: string;
-}
-
 const UsersTab = () => {
-  const { refetchUsers } = useUser();
+  const { currentUser, refetchUsers } = useUser();
   const [users, setUsers] = useState<User[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [organizationId, setOrganizationId] = useState<string | ''>('');
-  const [newOrganization, setNewOrganization] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
-    fetchOrganizations();
   }, []);
 
   const fetchUsers = async () => {
-    const res = await fetch('/api/users');
+    const res = await fetch('/api/users', { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setUsers(data);
-  };
-
-  const fetchOrganizations = async () => {
-    const res = await fetch('/api/organizations');
-    const data = await res.json();
-    setOrganizations(data);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,14 +35,14 @@ const UsersTab = () => {
     if (editingUser) {
       res = await fetch(`/api/users/${editingUser.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(currentUser?.id),
         body: JSON.stringify({ name, email }),
       });
     } else {
       res = await fetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, organizationId, newOrganization }),
+        headers: apiHeaders(currentUser?.id),
+        body: JSON.stringify({ name, email }),
       });
     }
     if (!res.ok) {
@@ -66,7 +52,6 @@ const UsersTab = () => {
     }
     resetForm();
     fetchUsers();
-    fetchOrganizations();
     refetchUsers();
   };
 
@@ -79,6 +64,7 @@ const UsersTab = () => {
   const handleDelete = async (id: string) => {
     await fetch(`/api/users/${id}`, {
       method: 'DELETE',
+      headers: getHeaders(currentUser?.id),
     });
     fetchUsers();
     refetchUsers();
@@ -88,8 +74,6 @@ const UsersTab = () => {
     setEditingUser(null);
     setName('');
     setEmail('');
-    setOrganizationId('');
-    setNewOrganization('');
   };
 
   return (
@@ -120,33 +104,6 @@ const UsersTab = () => {
               required
             />
           </div>
-          {!editingUser && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <select
-                value={organizationId}
-                onChange={(e) => {
-                  setOrganizationId(e.target.value);
-                  setNewOrganization('');
-                }}
-                className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              >
-                <option value="" disabled>Select an Organization</option>
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>{org.name}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Or Create a New Organization"
-                value={newOrganization}
-                onChange={(e) => {
-                  setNewOrganization(e.target.value);
-                  setOrganizationId('');
-                }}
-                className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              />
-            </div>
-          )}
           <div className="flex justify-end space-x-3">
             {editingUser && <button type="button" onClick={resetForm} className="px-6 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition">Cancel</button>}
             <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">{editingUser ? 'Update User' : 'Add User'}</button>

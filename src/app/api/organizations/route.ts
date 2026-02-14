@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import db, { generateId } from '@/lib/db';
-import { organizationRepository, folderRepository } from '@/lib/repositories';
+import { organizationRepository, folderRepository, userRepository } from '@/lib/repositories';
 import { addUserToOrganization } from '@/lib/user-organization-helpers';
-import { syncOrgCreated } from '@/lib/openfga-tuples';
+import { syncOrgCreated, syncUserAddedToOrg } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +46,9 @@ export async function POST(request: Request) {
     });
 
     await addUserToOrganization(userId, orgId, userRole);
-    await syncOrgCreated(orgId, hiddenRootId, userId);
+    await syncOrgCreated(orgId, hiddenRootId);
+    const creator = await userRepository.getById(userId);
+    await syncUserAddedToOrg(userId, orgId, creator?.name || '', userRole);
 
     return NextResponse.json(newOrg, { status: 201 });
   } catch (error) {

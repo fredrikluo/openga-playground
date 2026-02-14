@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@/context/UserContext';
+import { apiHeaders, getHeaders } from '@/lib/api';
 
 interface Group {
   id: string;
@@ -29,14 +30,14 @@ const GroupsTab = () => {
   const usersInSameOrg = users.filter(u => u.organization_id === currentUser?.organization_id);
 
   const fetchGroupMembers = useCallback(async (groupId: string) => {
-    const res = await fetch(`/api/groups/${groupId}`);
+    const res = await fetch(`/api/groups/${groupId}`, { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setMembersByGroup(prev => ({ ...prev, [groupId]: data.users || [] }));
-  }, []);
+  }, [currentUser]);
 
   const fetchGroups = useCallback(async () => {
     if (currentUser) {
-      const res = await fetch(`/api/groups?organizationId=${currentUser.organization_id}`);
+      const res = await fetch(`/api/groups?organizationId=${currentUser.organization_id}`, { headers: getHeaders(currentUser?.id) });
       const data: Group[] = await res.json();
       setGroups(data);
       data.forEach(group => fetchGroupMembers(group.id));
@@ -56,7 +57,7 @@ const GroupsTab = () => {
 
     await fetch('/api/groups', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({
         name,
         organization_id: currentUser.organization_id,
@@ -69,7 +70,7 @@ const GroupsTab = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/groups/${id}`, { method: 'DELETE' });
+    await fetch(`/api/groups/${id}`, { method: 'DELETE', headers: getHeaders(currentUser?.id) });
     fetchGroups();
   };
 
@@ -78,7 +79,7 @@ const GroupsTab = () => {
     const updatedIds = currentMembers.filter(u => u.id !== userId).map(u => u.id);
     await fetch(`/api/groups/${group.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({ name: group.name, user_ids: updatedIds }),
     });
     fetchGroupMembers(group.id);
@@ -90,7 +91,7 @@ const GroupsTab = () => {
     const updatedIds = [...currentMembers.map(u => u.id), selectedNewMemberId];
     await fetch(`/api/groups/${group.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({ name: group.name, user_ids: updatedIds }),
     });
     setAddingMemberToGroup(null);

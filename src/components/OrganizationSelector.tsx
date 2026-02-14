@@ -2,6 +2,7 @@
 
 import { useUser } from '@/context/UserContext';
 import { useOrganization } from '@/context/OrganizationContext';
+import { getHeaders } from '@/lib/api';
 import { useEffect } from 'react';
 import { Organization } from '@/lib/schema';
 
@@ -18,7 +19,7 @@ const OrganizationSelector = () => {
       }
 
       try {
-        const res = await fetch(`/api/users/${currentUser.id}/organizations`);
+        const res = await fetch(`/api/users/${currentUser.id}/organizations`, { headers: getHeaders(currentUser?.id) });
         if (!res.ok) {
           throw new Error('Failed to fetch organizations');
         }

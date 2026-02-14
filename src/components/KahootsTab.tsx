@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useUser } from '@/context/UserContext';
+import { apiHeaders, getHeaders } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 
 interface Kahoot {
@@ -41,7 +42,7 @@ const KahootsTab = () => {
 
   const fetchKahoots = async () => {
     if (!currentOrganization) return;
-    const res = await fetch(`/api/kahoots?organizationId=${currentOrganization.id}`);
+    const res = await fetch(`/api/kahoots?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setKahoots(data);
   };
@@ -50,12 +51,12 @@ const KahootsTab = () => {
     if (!currentOrganization) return;
 
     // Get organization's hidden root folder ID
-    const orgRes = await fetch(`/api/organizations/${currentOrganization.id}`);
+    const orgRes = await fetch(`/api/organizations/${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
     const orgData = await orgRes.json();
     const hiddenRootId = orgData.root_folder_id;
 
     // Fetch all folders and filter out the hidden root
-    const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`);
+    const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
 
     // Filter out the hidden root folder
@@ -70,13 +71,13 @@ const KahootsTab = () => {
     if (editingKahoot) {
       await fetch(`/api/kahoots/${editingKahoot.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(currentUser?.id),
         body: JSON.stringify(kahootData),
       });
     } else {
       await fetch('/api/kahoots', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(currentUser?.id),
         body: JSON.stringify(kahootData),
       });
     }
@@ -93,6 +94,7 @@ const KahootsTab = () => {
   const handleDelete = async (id: string) => {
     await fetch(`/api/kahoots/${id}`, {
       method: 'DELETE',
+      headers: getHeaders(currentUser?.id),
     });
     fetchKahoots();
   };

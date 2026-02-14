@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { folderRepository, kahootRepository } from '@/lib/repositories';
-import { syncFolderMoved } from '@/lib/openfga-tuples';
+import { syncFolderMoved, syncFolderDeletedRecursive } from '@/lib/openfga-tuples';
+import { check } from '@/lib/openfga';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -48,9 +50,20 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+    const userId = getCurrentUserId(request);
+
+    if (userId) {
+      const allowed = await check(`user:${userId}`, 'can_remove_effective', `folder:${id}`);
+      if (!allowed) {
+        return NextResponse.json({ message: 'Permission denied: cannot delete this folder' }, { status: 403 });
+      }
+    }
+
+    // Clean up FGA tuples before deleting from DB
+    await syncFolderDeletedRecursive(id);
 
     const info = await db.transaction(async () => {
       const folder = await folderRepository.getById(id);

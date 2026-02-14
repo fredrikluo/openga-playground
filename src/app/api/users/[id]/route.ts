@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { userRepository, userOrganizationRepository } from '@/lib/repositories';
 import { addUserToOrganization, removeUserFromOrganization } from '@/lib/user-organization-helpers';
-import { syncUserAddedToOrg, syncUserRemovedFromOrg } from '@/lib/openfga-tuples';
+import { syncUserAddedToOrg, syncUserRemovedFromOrg, syncAdminRole } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -39,7 +39,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         throw orgError;
       }
 
-      await syncUserAddedToOrg(id, organization_id, targetUser.name);
+      await syncUserAddedToOrg(id, organization_id, targetUser.name, role || 'member');
       return NextResponse.json({ message: 'User added to organization' });
     }
 
@@ -56,6 +56,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       }
 
       await userOrganizationRepository.updateRole(id, organization_id, role);
+      await syncAdminRole(id, organization_id, role);
       return NextResponse.json({ message: 'User role updated' });
     }
 

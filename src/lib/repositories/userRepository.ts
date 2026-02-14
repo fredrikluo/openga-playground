@@ -10,9 +10,9 @@ export const userRepository = {
     return db.getAll<User>('SELECT * FROM users ORDER BY name');
   },
 
-  async getByOrganization(orgId: string): Promise<User[]> {
-    return db.getAll<User>(`
-      SELECT DISTINCT u.id, u.name, u.email
+  async getByOrganization(orgId: string): Promise<(User & { role: string })[]> {
+    return db.getAll<User & { role: string }>(`
+      SELECT DISTINCT u.id, u.name, u.email, uo.role
       FROM users u
       JOIN user_organizations uo ON u.id = uo.user_id
       WHERE uo.organization_id = $1
