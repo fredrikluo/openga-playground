@@ -42,13 +42,14 @@ Everything is fully automatic — on first request, the app creates the OpenFGA 
 ### All Make commands
 
 ```bash
-make dev      # Start dev environment with hot reload
-make prod     # Build and start production environment
-make setup    # Re-upload OpenFGA model (after editing model.fga)
-make down     # Stop all services
-make clean    # Stop all services and delete all data
-make logs     # Tail logs from all services
-make help     # Show all available commands
+make dev              # Start dev environment with hot reload
+make prod             # Build and start production environment
+make generate-model   # Regenerate openfga-model.ts from model.fga
+make setup            # Re-upload OpenFGA model via API
+make down             # Stop all services
+make clean            # Stop all services and delete all data
+make logs             # Tail logs from all services
+make help             # Show all available commands
 ```
 
 ### Without Make
@@ -157,15 +158,16 @@ setup-openfga.sh           # Creates store + uploads model
 
 ## Updating the Authorization Model
 
-The model is defined in two places that must be kept in sync:
+Edit `openfga/model.fga`, then regenerate the TypeScript model and restart:
 
-- `openfga/model.fga` — human-readable DSL (source of truth for documentation)
-- `src/lib/openfga-model.ts` — JSON format used by the app for auto-upload
+```bash
+make generate-model
+# then restart the app (it auto-uploads on boot)
+```
 
-After editing the model, either:
+This converts `model.fga` into `src/lib/openfga-model.ts` using the `openfga/cli` Docker image — no local CLI needed. The app auto-uploads the model to OpenFGA on startup if none exists.
 
-1. Update `src/lib/openfga-model.ts` to match, then restart the app
-2. Or run `make setup` which transforms `model.fga` to JSON and uploads it directly via the OpenFGA API (uses the `openfga/cli` Docker image, no local CLI needed)
+Alternatively, `make setup` uploads the model directly to the running OpenFGA instance without rebuilding the app.
 
 ## Resetting Data
 
