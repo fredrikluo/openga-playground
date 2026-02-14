@@ -46,7 +46,7 @@ const OrganizationSelector = () => {
   }, [currentUser]); // Only depend on currentUser, not currentOrganization
 
   const handleSelectOrganization = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const orgId = parseInt(e.target.value, 10);
+    const orgId = e.target.value;
     const selectedOrg = organizations.find((org) => org.id === orgId) || null;
     setCurrentOrganization(selectedOrg);
   };

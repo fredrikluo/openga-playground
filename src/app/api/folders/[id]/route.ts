@@ -36,7 +36,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 
     if (oldFolder) {
-      await syncFolderMoved(Number(id), oldFolder.parent_folder_id, parent_folder_id ?? null);
+      await syncFolderMoved(id, oldFolder.parent_folder_id, parent_folder_id ?? null);
     }
 
     return NextResponse.json({ id, name, parent_folder_id });
@@ -53,7 +53,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { id } = await context.params;
 
-    const deleteFolderAndContents = (folderId: number | bigint) => {
+    const deleteFolderAndContents = (folderId: string) => {
       const subfolders = getAll<Pick<Folder, 'id'>>('SELECT id FROM folders WHERE parent_folder_id = ?', folderId);
       for (const subfolder of subfolders) {
         deleteFolderAndContents(subfolder.id);

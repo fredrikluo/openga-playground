@@ -3,10 +3,10 @@
 import { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  organization_id: number;
+  organization_id: string;
 }
 
 interface UserContextType {

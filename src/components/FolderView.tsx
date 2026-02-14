@@ -3,15 +3,15 @@
 import { Folder, FileText, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 
 interface Kahoot {
-  id: number;
+  id: string;
   name: string;
 }
 
 interface SubFolder {
-  id: number;
+  id: string;
   name: string;
-  parent_folder_id: number | null;
-  organization_id: number;
+  parent_folder_id: string | null;
+  organization_id: string;
 }
 
 interface FolderPermissions {
@@ -24,12 +24,12 @@ interface FolderPermissions {
 interface FolderViewProps {
   folders: SubFolder[];
   kahoots: Kahoot[];
-  currentFolder: { id: number; name: string; parent_folder_id: number | null } | null;
-  onFolderClick: (folderId: number) => void;
+  currentFolder: { id: string; name: string; parent_folder_id: string | null } | null;
+  onFolderClick: (folderId: string) => void;
   onBackClick: () => void;
   viewType: 'grid' | 'list';
   onEdit: (folder: SubFolder) => void;
-  onDelete: (folderId: number) => void;
+  onDelete: (folderId: string) => void;
   permissions?: FolderPermissions;
 }
 

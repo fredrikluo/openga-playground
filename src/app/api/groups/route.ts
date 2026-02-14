@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll } from '@/lib/db';
+import db, { getAll, generateId } from '@/lib/db';
 import type { Group } from '@/lib/schema';
 import { writeGroupTuples } from '@/lib/openfga-tuples';
 
@@ -28,10 +28,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Name and organization_id are required' }, { status: 400 });
     }
 
+    const groupId = generateId();
+
     const transaction = db.transaction(() => {
-      const groupStmt = db.prepare('INSERT INTO groups (name, organization_id) VALUES (?, ?)');
-      const groupInfo = groupStmt.run(name, organization_id);
-      const groupId = groupInfo.lastInsertRowid;
+      db.prepare('INSERT INTO groups (id, name, organization_id) VALUES (?, ?, ?)').run(groupId, name, organization_id);
 
       if (user_ids && user_ids.length > 0) {
         const addUserStmt = db.prepare('INSERT INTO group_users (group_id, user_id) VALUES (?, ?)');
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     });
 
     const newGroup = transaction();
-    await writeGroupTuples(newGroup.id, organization_id, user_ids || []);
+    await writeGroupTuples(groupId, organization_id, user_ids || []);
 
     return NextResponse.json(newGroup, { status: 201 });
   } catch (error) {

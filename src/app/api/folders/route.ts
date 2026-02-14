@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll, getOne } from '@/lib/db';
+import db, { getAll, getOne, generateId } from '@/lib/db';
 import type { Folder } from '@/lib/schema';
 import { writeFolderTuples } from '@/lib/openfga-tuples';
 
@@ -39,12 +39,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'organization_id is required' }, { status: 400 });
     }
 
-    const stmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, ?, ?)');
-    const info = stmt.run(name, parent_folder_id, orgId);
+    const folderId = generateId();
+    db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, ?, ?)').run(folderId, name, parent_folder_id, orgId);
 
-    await writeFolderTuples(info.lastInsertRowid, orgId, parent_folder_id || null);
+    await writeFolderTuples(folderId, orgId, parent_folder_id || null);
 
-    return NextResponse.json({ id: info.lastInsertRowid, name, parent_folder_id, organization_id: orgId }, { status: 201 });
+    return NextResponse.json({ id: folderId, name, parent_folder_id, organization_id: orgId }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
       return NextResponse.json({ message: 'A folder with this name already exists at this location' }, { status: 409 });

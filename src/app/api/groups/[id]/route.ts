@@ -26,7 +26,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
     }
 
-    const oldMembers = getAll<{ user_id: number }>('SELECT user_id FROM group_users WHERE group_id = ?', id);
+    const oldMembers = getAll<{ user_id: string }>('SELECT user_id FROM group_users WHERE group_id = ?', id);
 
     const transaction = db.transaction(() => {
       const updateStmt = db.prepare('UPDATE groups SET name = ? WHERE id = ?');
@@ -50,7 +50,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Group not found' }, { status: 404 });
     }
 
-    await syncGroupMembers(Number(id), oldMembers.map(m => m.user_id), user_ids || []);
+    await syncGroupMembers(id, oldMembers.map(m => m.user_id), user_ids || []);
 
     return NextResponse.json({ id, name, user_ids });
   } catch (error) {
@@ -64,7 +64,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const { id } = await context.params;
 
     const group = getOne<Group>('SELECT * FROM groups WHERE id = ?', id);
-    const members = getAll<{ user_id: number }>('SELECT user_id FROM group_users WHERE group_id = ?', id);
+    const members = getAll<{ user_id: string }>('SELECT user_id FROM group_users WHERE group_id = ?', id);
 
     const transaction = db.transaction(() => {
       db.prepare('DELETE FROM group_users WHERE group_id = ?').run(id);
@@ -78,7 +78,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     }
 
     if (group) {
-      await deleteGroupTuples(Number(id), group.organization_id, members.map(m => m.user_id));
+      await deleteGroupTuples(id, group.organization_id, members.map(m => m.user_id));
     }
 
     return NextResponse.json({ message: 'Group deleted successfully' });

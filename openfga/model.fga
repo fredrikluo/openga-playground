@@ -5,7 +5,7 @@ type user
 
 type organization
   relations
-    # Org membership is the global “kill switch”
+    # Org membership is the global "kill switch"
     define member: [user]
 
     define top_folder: [folder]
@@ -31,9 +31,9 @@ type folder
     define viewer:  [user, group#member]
 
     # Inherited roles (creator is intentionally NOT inherited)
-    define manager_inherited: manager or parent->manager_inherited
-    define editor_inherited:  editor  or parent->editor_inherited
-    define viewer_inherited:  viewer  or parent->viewer_inherited
+    define manager_inherited: manager or manager_inherited from parent
+    define editor_inherited:  editor  or editor_inherited from parent
+    define viewer_inherited:  viewer  or viewer_inherited from parent
 
     # --- Permissions to match your table ---
 
@@ -54,13 +54,13 @@ type folder
     define can_lock: manager_inherited
 
     # Effective permissions: must also be an org member
-    define can_view_effective:          can_view          and in_org->member
-    define can_create_effective:        can_create        and in_org->member
-    define can_edit_effective:          can_edit          and in_org->member
-    define can_duplicate_effective:     can_duplicate     and in_org->member
-    define can_remove_effective:        can_remove        and in_org->member
-    define can_set_visibility_effective: can_set_visibility and in_org->member
-    define can_lock_effective:          can_lock          and in_org->member
+    define can_view_effective:           can_view           and member from in_org
+    define can_create_effective:         can_create         and member from in_org
+    define can_edit_effective:           can_edit           and member from in_org
+    define can_duplicate_effective:      can_duplicate      and member from in_org
+    define can_remove_effective:         can_remove         and member from in_org
+    define can_set_visibility_effective: can_set_visibility and member from in_org
+    define can_lock_effective:           can_lock           and member from in_org
 
 type document
   relations
@@ -81,9 +81,9 @@ type document
 
     # Inherit roles from parent folder + allow doc-local overrides
     # (creator is intentionally NOT inherited)
-    define manager_inherited: manager or parent->manager_inherited
-    define editor_inherited:  editor  or parent->editor_inherited
-    define viewer_inherited:  viewer  or parent->viewer_inherited
+    define manager_inherited: manager or manager_inherited from parent
+    define editor_inherited:  editor  or editor_inherited from parent
+    define viewer_inherited:  viewer  or viewer_inherited from parent
 
     # --- Permissions to match your table ---
 
@@ -104,10 +104,10 @@ type document
     define can_lock: manager_inherited
 
     # Effective permissions: must also be an org member
-    define can_view_effective:           can_view           and in_org->member
-    define can_create_effective:         can_create         and in_org->member
-    define can_edit_effective:           can_edit           and in_org->member
-    define can_duplicate_effective:      can_duplicate      and in_org->member
-    define can_remove_effective:         can_remove         and in_org->member
-    define can_set_visibility_effective: can_set_visibility and in_org->member
-    define can_lock_effective:           can_lock           and in_org->member
+    define can_view_effective:           can_view           and member from in_org
+    define can_create_effective:         can_create         and member from in_org
+    define can_edit_effective:           can_edit           and member from in_org
+    define can_duplicate_effective:      can_duplicate      and member from in_org
+    define can_remove_effective:         can_remove         and member from in_org
+    define can_set_visibility_effective: can_set_visibility and member from in_org
+    define can_lock_effective:           can_lock           and member from in_org

@@ -30,10 +30,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    // Add user to organization
     if (action === 'add_to_org' && organization_id) {
       try {
-        addUserToOrganization(Number(id), organization_id, role || 'member');
+        addUserToOrganization(id, organization_id, role || 'member');
       } catch (orgError: unknown) {
         if (orgError instanceof Error && orgError.message.includes('A user with this name already exists')) {
           return NextResponse.json({ message: orgError.message }, { status: 409 });
@@ -41,18 +40,16 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         throw orgError;
       }
 
-      await syncUserAddedToOrg(Number(id), organization_id, targetUser.name);
+      await syncUserAddedToOrg(id, organization_id, targetUser.name);
       return NextResponse.json({ message: 'User added to organization' });
     }
 
-    // Remove user from organization
     if (action === 'remove_from_org' && organization_id) {
-      removeUserFromOrganization(Number(id), organization_id);
-      await syncUserRemovedFromOrg(Number(id), organization_id);
+      removeUserFromOrganization(id, organization_id);
+      await syncUserRemovedFromOrg(id, organization_id);
       return NextResponse.json({ message: 'User removed from organization' });
     }
 
-    // Update role within an organization
     if (role && organization_id) {
       const allowedRoles = ['admin', 'coadmin', 'member', 'limited member'];
       if (!allowedRoles.includes(role)) {
@@ -109,11 +106,11 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const userOrgs = db.prepare(`
       SELECT organization_id FROM user_organizations WHERE user_id = ?
-    `).all(id) as { organization_id: number }[];
+    `).all(id) as { organization_id: string }[];
 
     for (const org of userOrgs) {
-      removeUserFromOrganization(Number(id), org.organization_id);
-      await syncUserRemovedFromOrg(Number(id), org.organization_id);
+      removeUserFromOrganization(id, org.organization_id);
+      await syncUserRemovedFromOrg(id, org.organization_id);
     }
 
     const stmt = db.prepare('DELETE FROM users WHERE id = ?');

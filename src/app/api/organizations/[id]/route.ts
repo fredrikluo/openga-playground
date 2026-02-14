@@ -40,7 +40,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { id } = await context.params;
 
-    const orgMembers = getAll<{ user_id: number }>(
+    const orgMembers = getAll<{ user_id: string }>(
       'SELECT user_id FROM user_organizations WHERE organization_id = ?', id
     );
 
@@ -65,7 +65,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
     }
 
-    await syncOrgDeleted(Number(id), orgMembers.map(m => m.user_id));
+    await syncOrgDeleted(id, orgMembers.map(m => m.user_id));
 
     return NextResponse.json({ message: 'Organization deleted successfully' });
   } catch (error) {

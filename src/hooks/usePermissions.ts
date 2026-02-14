@@ -24,9 +24,9 @@ const DEFAULT_PERMISSIONS: PermissionResult = {
 };
 
 export function usePermissions(
-  userId: number | null | undefined,
+  userId: string | null | undefined,
   objectType: 'folder' | 'document',
-  objectId: number | null | undefined
+  objectId: string | null | undefined
 ) {
   const [permissions, setPermissions] = useState<PermissionResult>(DEFAULT_PERMISSIONS);
   const [loading, setLoading] = useState(false);
@@ -67,7 +67,7 @@ export interface RoleAssignment {
   object: string;
 }
 
-export function useRoleAssignments(objectType: 'folder' | 'document', objectId: number | null | undefined) {
+export function useRoleAssignments(objectType: 'folder' | 'document', objectId: string | null | undefined) {
   const [assignments, setAssignments] = useState<RoleAssignment[]>([]);
   const [loading, setLoading] = useState(false);
 

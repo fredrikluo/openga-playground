@@ -8,34 +8,34 @@ import { useUser } from '@/context/UserContext';
 import { usePermissions, useRoleAssignments } from '@/hooks/usePermissions';
 
 interface Folder {
-  id: number;
+  id: string;
   name: string;
-  parent_folder_id: number | null;
-  organization_id: number;
+  parent_folder_id: string | null;
+  organization_id: string;
 }
 
 interface Kahoot {
-  id: number;
+  id: string;
   name: string;
 }
 
 interface FolderContent {
-  id: number;
+  id: string;
   name: string;
-  parent_folder_id: number | null;
+  parent_folder_id: string | null;
   subfolders: Folder[];
   kahoots: Kahoot[];
 }
 
 interface User {
-  id: number;
+  id: string;
   name: string;
 }
 
 const FoldersTab = () => {
   const { currentOrganization } = useOrganization();
   const { currentUser } = useUser();
-  const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderContent, setFolderContent] = useState<FolderContent | null>(null);
   const [name, setName] = useState('');
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
@@ -86,7 +86,7 @@ const FoldersTab = () => {
     setAllFolders(data);
   };
 
-  const fetchFolderContent = async (folderId: number | null) => {
+  const fetchFolderContent = async (folderId: string | null) => {
     if (!currentOrganization) return;
 
     if (folderId === null) {
@@ -98,7 +98,7 @@ const FoldersTab = () => {
       const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`);
       const data = await res.json();
       setFolderContent({
-        id: 0,
+        id: '',
         name: 'Home',
         parent_folder_id: null,
         subfolders: data.filter((f: Folder) => f.parent_folder_id === hiddenRootId),
@@ -111,7 +111,7 @@ const FoldersTab = () => {
     }
   };
 
-  const handleFolderClick = (folderId: number) => {
+  const handleFolderClick = (folderId: string) => {
     setCurrentFolderId(folderId);
   };
 
@@ -239,7 +239,7 @@ const FoldersTab = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     await fetch(`/api/folders/${id}`, {
       method: 'DELETE',
     });

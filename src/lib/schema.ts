@@ -1,51 +1,51 @@
 export interface Organization {
-  id: number;
+  id: string;
   name: string;
-  root_folder_id: number;
+  root_folder_id: string;
 }
 
 export type UserRole = 'admin' | 'coadmin' | 'member' | 'limited member';
 
 export interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
 }
 
 export interface UserOrganization {
-  user_id: number;
-  organization_id: number;
+  user_id: string;
+  organization_id: string;
   role: UserRole;
 }
 
 export interface UserWithOrganizations extends User {
   organizations: Array<{
-    id: number;
+    id: string;
     name: string;
     role: UserRole;
   }>;
 }
 
 export interface Group {
-  id: number;
+  id: string;
   name: string;
-  organization_id: number;
+  organization_id: string;
 }
 
 export interface GroupUser {
-  group_id: number;
-  user_id: number;
+  group_id: string;
+  user_id: string;
 }
 
 export interface Folder {
-  id: number;
+  id: string;
   name: string;
-  parent_folder_id: number | null;
-  organization_id: number;
+  parent_folder_id: string | null;
+  organization_id: string;
 }
 
 export interface Kahoot {
-  id: number;
+  id: string;
   name: string;
-  folder_id: number;
+  folder_id: string;
 }

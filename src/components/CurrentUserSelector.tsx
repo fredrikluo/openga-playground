@@ -6,7 +6,7 @@ const CurrentUserSelector = () => {
   const { users, currentUser, setCurrentUser } = useUser();
 
   const handleSelectUser = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const userId = parseInt(e.target.value, 10);
+    const userId = e.target.value;
     const selectedUser = users.find((user) => user.id === userId) || null;
     setCurrentUser(selectedUser);
   };

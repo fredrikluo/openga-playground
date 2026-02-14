@@ -6,22 +6,22 @@ import type { Organization, Folder } from './schema';
 // Low-level tuple helpers
 // ============================================================
 
-export async function writeOrgMemberTuple(userId: number | bigint, orgId: number | bigint) {
+export async function writeOrgMemberTuple(userId: string, orgId: string) {
   await writeTuples([
     { user: `user:${userId}`, relation: 'member', object: `organization:${orgId}` },
   ]);
 }
 
-export async function deleteOrgMemberTuple(userId: number | bigint, orgId: number | bigint) {
+export async function deleteOrgMemberTuple(userId: string, orgId: string) {
   await deleteTuples([
     { user: `user:${userId}`, relation: 'member', object: `organization:${orgId}` },
   ]);
 }
 
 export async function writeGroupTuples(
-  groupId: number | bigint,
-  orgId: number | bigint,
-  memberIds: (number | bigint)[]
+  groupId: string,
+  orgId: string,
+  memberIds: (string)[]
 ) {
   const tuples = [
     { user: `organization:${orgId}`, relation: 'in_org', object: `group:${groupId}` },
@@ -35,9 +35,9 @@ export async function writeGroupTuples(
 }
 
 export async function deleteGroupTuples(
-  groupId: number | bigint,
-  orgId: number | bigint,
-  memberIds: (number | bigint)[]
+  groupId: string,
+  orgId: string,
+  memberIds: (string)[]
 ) {
   const tuples = [
     { user: `organization:${orgId}`, relation: 'in_org', object: `group:${groupId}` },
@@ -51,9 +51,9 @@ export async function deleteGroupTuples(
 }
 
 export async function syncGroupMembers(
-  groupId: number | bigint,
-  oldMemberIds: (number | bigint)[],
-  newMemberIds: (number | bigint)[]
+  groupId: string,
+  oldMemberIds: (string)[],
+  newMemberIds: (string)[]
 ) {
   const oldSet = new Set(oldMemberIds.map(String));
   const newSet = new Set(newMemberIds.map(String));
@@ -83,9 +83,9 @@ export async function syncGroupMembers(
 }
 
 export async function writeFolderTuples(
-  folderId: number | bigint,
-  orgId: number | bigint,
-  parentFolderId: number | bigint | null
+  folderId: string,
+  orgId: string,
+  parentFolderId: string | null
 ) {
   const tuples = [
     { user: `organization:${orgId}`, relation: 'in_org', object: `folder:${folderId}` },
@@ -101,9 +101,9 @@ export async function writeFolderTuples(
 }
 
 export async function updateFolderParentTuple(
-  folderId: number | bigint,
-  oldParentId: number | bigint | null,
-  newParentId: number | bigint | null
+  folderId: string,
+  oldParentId: string | null,
+  newParentId: string | null
 ) {
   if (oldParentId !== null) {
     await deleteTuples([
@@ -118,9 +118,9 @@ export async function updateFolderParentTuple(
 }
 
 export async function writeDocumentTuples(
-  kahootId: number | bigint,
-  folderId: number | bigint,
-  orgId: number | bigint
+  kahootId: string,
+  folderId: string,
+  orgId: string
 ) {
   await writeTuples([
     { user: `folder:${folderId}`, relation: 'parent', object: `document:${kahootId}` },
@@ -129,9 +129,9 @@ export async function writeDocumentTuples(
 }
 
 export async function updateDocumentParentTuple(
-  kahootId: number | bigint,
-  oldFolderId: number | bigint,
-  newFolderId: number | bigint
+  kahootId: string,
+  oldFolderId: string,
+  newFolderId: string
 ) {
   await deleteTuples([
     { user: `folder:${oldFolderId}`, relation: 'parent', object: `document:${kahootId}` },
@@ -142,9 +142,9 @@ export async function updateDocumentParentTuple(
 }
 
 export async function deleteDocumentTuples(
-  kahootId: number | bigint,
-  folderId: number | bigint,
-  orgId: number | bigint
+  kahootId: string,
+  folderId: string,
+  orgId: string
 ) {
   await deleteTuples([
     { user: `folder:${folderId}`, relation: 'parent', object: `document:${kahootId}` },
@@ -161,9 +161,9 @@ export async function deleteDocumentTuples(
  * After creating an organization: sync org membership, root folder, and all child folders.
  */
 export async function syncOrgCreated(
-  orgId: number | bigint,
-  rootFolderId: number | bigint,
-  creatorUserId: number | bigint
+  orgId: string,
+  rootFolderId: string,
+  creatorUserId: string
 ) {
   await writeOrgMemberTuple(creatorUserId, orgId);
   await writeFolderTuples(rootFolderId, orgId, null);
@@ -180,8 +180,8 @@ export async function syncOrgCreated(
  * After deleting an organization: clean up org membership tuples.
  */
 export async function syncOrgDeleted(
-  orgId: number | bigint,
-  memberUserIds: number[]
+  orgId: string,
+  memberUserIds: string[]
 ) {
   for (const userId of memberUserIds) {
     await deleteOrgMemberTuple(userId, orgId);
@@ -192,8 +192,8 @@ export async function syncOrgDeleted(
  * After adding a user to an existing organization: sync org membership + personal folder.
  */
 export async function syncUserAddedToOrg(
-  userId: number | bigint,
-  orgId: number | bigint,
+  userId: string,
+  orgId: string,
   userName: string
 ) {
   await writeOrgMemberTuple(userId, orgId);
@@ -213,8 +213,8 @@ export async function syncUserAddedToOrg(
  * After removing a user from an organization: delete org membership tuple.
  */
 export async function syncUserRemovedFromOrg(
-  userId: number | bigint,
-  orgId: number | bigint
+  userId: string,
+  orgId: string
 ) {
   await deleteOrgMemberTuple(userId, orgId);
 }
@@ -223,8 +223,8 @@ export async function syncUserRemovedFromOrg(
  * After creating a kahoot: sync document tuples (looks up org from folder).
  */
 export async function syncKahootCreated(
-  kahootId: number | bigint,
-  folderId: number | bigint
+  kahootId: string,
+  folderId: string
 ) {
   const folder = getOne<Folder>('SELECT organization_id FROM folders WHERE id = ?', folderId);
   if (folder) {
@@ -236,9 +236,9 @@ export async function syncKahootCreated(
  * After updating a kahoot's folder: sync parent tuple if folder changed.
  */
 export async function syncKahootUpdated(
-  kahootId: number | bigint,
-  oldFolderId: number | bigint,
-  newFolderId: number | bigint
+  kahootId: string,
+  oldFolderId: string,
+  newFolderId: string
 ) {
   if (oldFolderId !== newFolderId) {
     await updateDocumentParentTuple(kahootId, oldFolderId, newFolderId);
@@ -249,8 +249,8 @@ export async function syncKahootUpdated(
  * After deleting a kahoot: clean up document tuples (looks up org from folder).
  */
 export async function syncKahootDeleted(
-  kahootId: number | bigint,
-  folderId: number | bigint
+  kahootId: string,
+  folderId: string
 ) {
   const folder = getOne<Folder>('SELECT organization_id FROM folders WHERE id = ?', folderId);
   if (folder) {
@@ -262,9 +262,9 @@ export async function syncKahootDeleted(
  * After updating a folder's parent: sync parent tuple if it changed.
  */
 export async function syncFolderMoved(
-  folderId: number | bigint,
-  oldParentId: number | bigint | null,
-  newParentId: number | bigint | null
+  folderId: string,
+  oldParentId: string | null,
+  newParentId: string | null
 ) {
   if (oldParentId !== newParentId) {
     await updateFolderParentTuple(folderId, oldParentId, newParentId);

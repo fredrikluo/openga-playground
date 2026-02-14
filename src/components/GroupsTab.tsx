@@ -4,31 +4,31 @@ import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@/context/UserContext';
 
 interface Group {
-  id: number;
+  id: string;
   name: string;
-  organization_id: number;
+  organization_id: string;
 }
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  organization_id: number;
+  organization_id: string;
 }
 
 const GroupsTab = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [name, setName] = useState('');
-  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
-  const [membersByGroup, setMembersByGroup] = useState<Record<number, User[]>>({});
-  const [addingMemberToGroup, setAddingMemberToGroup] = useState<number | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [membersByGroup, setMembersByGroup] = useState<Record<string, User[]>>({});
+  const [addingMemberToGroup, setAddingMemberToGroup] = useState<string | null>(null);
   const [selectedNewMemberId, setSelectedNewMemberId] = useState<string>('');
-  const [pageByGroup, setPageByGroup] = useState<Record<number, number>>({});
+  const [pageByGroup, setPageByGroup] = useState<Record<string, number>>({});
   const { currentUser, users } = useUser();
 
   const usersInSameOrg = users.filter(u => u.organization_id === currentUser?.organization_id);
 
-  const fetchGroupMembers = useCallback(async (groupId: number) => {
+  const fetchGroupMembers = useCallback(async (groupId: string) => {
     const res = await fetch(`/api/groups/${groupId}`);
     const data = await res.json();
     setMembersByGroup(prev => ({ ...prev, [groupId]: data.users || [] }));
@@ -68,12 +68,12 @@ const GroupsTab = () => {
     fetchGroups();
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     await fetch(`/api/groups/${id}`, { method: 'DELETE' });
     fetchGroups();
   };
 
-  const handleRemoveMember = async (group: Group, userId: number) => {
+  const handleRemoveMember = async (group: Group, userId: string) => {
     const currentMembers = membersByGroup[group.id] || [];
     const updatedIds = currentMembers.filter(u => u.id !== userId).map(u => u.id);
     await fetch(`/api/groups/${group.id}`, {
@@ -87,7 +87,7 @@ const GroupsTab = () => {
   const handleAddMember = async (group: Group) => {
     if (!selectedNewMemberId) return;
     const currentMembers = membersByGroup[group.id] || [];
-    const updatedIds = [...currentMembers.map(u => u.id), Number(selectedNewMemberId)];
+    const updatedIds = [...currentMembers.map(u => u.id), selectedNewMemberId];
     await fetch(`/api/groups/${group.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -98,7 +98,7 @@ const GroupsTab = () => {
     fetchGroupMembers(group.id);
   };
 
-  const getAvailableUsers = (groupId: number) => {
+  const getAvailableUsers = (groupId: string) => {
     const currentMembers = membersByGroup[groupId] || [];
     const memberIds = new Set(currentMembers.map(u => u.id));
     return usersInSameOrg.filter(u => !memberIds.has(u.id));
@@ -123,7 +123,7 @@ const GroupsTab = () => {
               <select
                 multiple
                 value={selectedUserIds.map(String)}
-                onChange={(e) => setSelectedUserIds(Array.from(e.target.selectedOptions, option => Number(option.value)))}
+                onChange={(e) => setSelectedUserIds(Array.from(e.target.selectedOptions, option => option.value))}
                 className="w-full h-32 border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               >
                 {usersInSameOrg.map(user => (

@@ -14,22 +14,25 @@ done
 
 echo "OpenFGA is ready!"
 
-# Create a new authorization model
-echo "Creating authorization model..."
+# Check if a store named "kahoot-manager" already exists
+EXISTING_STORE_ID=$(curl -s http://localhost:8080/stores | jq -r '.stores[] | select(.name == "kahoot-manager") | .id' | head -1)
 
-# Create the authorization model using curl
-curl -X POST http://localhost:8080/stores \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "kahoot-manager"
-  }' | jq -r '.id' > .store_id
+if [ -n "$EXISTING_STORE_ID" ] && [ "$EXISTING_STORE_ID" != "null" ]; then
+  echo "Found existing store 'kahoot-manager' with ID: $EXISTING_STORE_ID"
+  STORE_ID="$EXISTING_STORE_ID"
+else
+  echo "Creating new store..."
+  STORE_ID=$(curl -s -X POST http://localhost:8080/stores \
+    -H "Content-Type: application/json" \
+    -d '{"name": "kahoot-manager"}' | jq -r '.id')
+  echo "Created store with ID: $STORE_ID"
+fi
 
-STORE_ID=$(cat .store_id)
+echo "$STORE_ID" > .store_id
 
-echo "Created store with ID: $STORE_ID"
-
-# Convert the FGA model to JSON and upload it
-MODEL_JSON=$(fga model transform --file openfga/model.fga)
+# Convert FGA model to JSON (uses Docker CLI image for full syntax support)
+echo "Transforming model.fga to JSON..."
+MODEL_JSON=$(docker run --rm -i openfga/cli model transform --file /dev/stdin --input-format fga < openfga/model.fga)
 
 MODEL_RESPONSE=$(curl -s -X POST "http://localhost:8080/stores/$STORE_ID/authorization-models" \
   -H "Content-Type: application/json" \

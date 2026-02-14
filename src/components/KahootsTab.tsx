@@ -6,13 +6,13 @@ import { useUser } from '@/context/UserContext';
 import { usePermissions } from '@/hooks/usePermissions';
 
 interface Kahoot {
-  id: number;
+  id: string;
   name: string;
-  folder_id: number;
+  folder_id: string;
 }
 
 interface Folder {
-  id: number;
+  id: string;
   name: string;
 }
 
@@ -22,9 +22,9 @@ const KahootsTab = () => {
   const [kahoots, setKahoots] = useState<Kahoot[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [name, setName] = useState('');
-  const [folderId, setFolderId] = useState<number | ''>('');
+  const [folderId, setFolderId] = useState<string | ''>('');
   const [editingKahoot, setEditingKahoot] = useState<Kahoot | null>(null);
-  const [selectedKahootId, setSelectedKahootId] = useState<number | null>(null);
+  const [selectedKahootId, setSelectedKahootId] = useState<string | null>(null);
 
   // Check permissions for the selected kahoot (document)
   const { permissions } = usePermissions(currentUser?.id, 'document', selectedKahootId);
@@ -90,7 +90,7 @@ const KahootsTab = () => {
     setFolderId(kahoot.folder_id);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     await fetch(`/api/kahoots/${id}`, {
       method: 'DELETE',
     });
@@ -103,7 +103,7 @@ const KahootsTab = () => {
     setFolderId('');
   };
 
-  const getFolderName = (folderId: number) => {
+  const getFolderName = (folderId: string) => {
     const folder = folders.find((f) => f.id === folderId);
     return folder ? folder.name : '...';
   };
@@ -132,7 +132,7 @@ const KahootsTab = () => {
             />
             <select
               value={folderId}
-              onChange={(e) => setFolderId(Number(e.target.value))}
+              onChange={(e) => setFolderId(e.target.value)}
               className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               required
             >

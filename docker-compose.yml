@@ -30,12 +30,25 @@ services:
       - OPENFGA_STORE_ID=${OPENFGA_STORE_ID:-}
       - OPENFGA_MODEL_ID=${OPENFGA_MODEL_ID:-}
     depends_on:
-      - openfga
+      openfga:
+        condition: service_started
     networks:
       - app-network
     volumes:
       # Mount the SQLite database directory for persistence
       - ./data:/app/data
+
+  openfga-migrate:
+    image: openfga/openfga:latest
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    command: migrate
 
   openfga:
     image: openfga/openfga:latest
@@ -56,8 +69,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      openfga-migrate:
+        condition: service_completed_successfully
     volumes:
-      # Mount the authorization model for easy access
       - ./openfga:/models
     networks:
       - app-network

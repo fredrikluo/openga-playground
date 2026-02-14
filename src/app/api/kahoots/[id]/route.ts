@@ -34,7 +34,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 
     if (oldKahoot) {
-      await syncKahootUpdated(Number(id), oldKahoot.folder_id, folder_id);
+      await syncKahootUpdated(id, oldKahoot.folder_id, folder_id);
     }
 
     return NextResponse.json({ id, name, folder_id });
@@ -57,7 +57,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     }
 
     if (kahoot) {
-      await syncKahootDeleted(Number(id), kahoot.folder_id);
+      await syncKahootDeleted(id, kahoot.folder_id);
     }
 
     return NextResponse.json({ message: 'Kahoot deleted successfully' });

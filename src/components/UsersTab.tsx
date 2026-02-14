@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
 }
 
 interface Organization {
-  id: number;
+  id: string;
   name: string;
 }
 
@@ -21,7 +21,7 @@ const UsersTab = () => {
   const [email, setEmail] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [organizationId, setOrganizationId] = useState<number | ''>('');
+  const [organizationId, setOrganizationId] = useState<string | ''>('');
   const [newOrganization, setNewOrganization] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +76,7 @@ const UsersTab = () => {
     setEmail(user.email);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     await fetch(`/api/users/${id}`, {
       method: 'DELETE',
     });
@@ -125,7 +125,7 @@ const UsersTab = () => {
               <select
                 value={organizationId}
                 onChange={(e) => {
-                  setOrganizationId(Number(e.target.value));
+                  setOrganizationId(e.target.value);
                   setNewOrganization('');
                 }}
                 className="border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"

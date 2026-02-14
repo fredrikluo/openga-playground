@@ -5,13 +5,13 @@ import { useUser } from '@/context/UserContext';
 import { useOrganization } from '@/context/OrganizationContext';
 
 interface Organization {
-  id: number;
+  id: string;
   name: string;
-  root_folder_id: number;
+  root_folder_id: string;
 }
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: 'admin' | 'coadmin' | 'member' | 'limited member';
@@ -19,16 +19,16 @@ interface User {
 
 const OrganizationsTab = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [usersByOrg, setUsersByOrg] = useState<Record<number, User[]>>({});
-  const [editingOrgId, setEditingOrgId] = useState<number | null>(null);
+  const [usersByOrg, setUsersByOrg] = useState<Record<string, User[]>>({});
+  const [editingOrgId, setEditingOrgId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const { currentUser, refetchUsers } = useUser();
   const { setOrganizations: setGlobalOrganizations, currentOrganization, setCurrentOrganization } = useOrganization();
   const [newOrganizationName, setNewOrganizationName] = useState('');
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>('');
-  const [addingMemberToOrg, setAddingMemberToOrg] = useState<number | null>(null);
-  const [pageByOrg, setPageByOrg] = useState<Record<number, number>>({});
+  const [addingMemberToOrg, setAddingMemberToOrg] = useState<string | null>(null);
+  const [pageByOrg, setPageByOrg] = useState<Record<string, number>>({});
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
   const [selectedOrgToJoin, setSelectedOrgToJoin] = useState<string>('');
@@ -45,7 +45,7 @@ const OrganizationsTab = () => {
     setAllOrganizations(data);
   };
 
-  const fetchOrgUsers = useCallback(async (organizationId: number) => {
+  const fetchOrgUsers = useCallback(async (organizationId: string) => {
     if (!currentUser) return;
     const res = await fetch(`/api/users?organizationId=${organizationId}`);
     const data = await res.json();
@@ -112,7 +112,7 @@ const OrganizationsTab = () => {
     fetchOrganizations();
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     await fetch(`/api/organizations/${id}`, { method: 'DELETE' });
 
     // If current user deleted their currently selected org, switch to another org
@@ -131,7 +131,7 @@ const OrganizationsTab = () => {
     fetchAllOrganizations();
   };
 
-  const handleRoleChange = async (userId: number, role: string, organizationId: number) => {
+  const handleRoleChange = async (userId: string, role: string, organizationId: string) => {
     if (!currentUser) return;
     await fetch(`/api/users/${userId}`, {
       method: 'PATCH',
@@ -141,7 +141,7 @@ const OrganizationsTab = () => {
     fetchOrgUsers(organizationId);
   };
 
-  const handleAddMember = async (organizationId: number) => {
+  const handleAddMember = async (organizationId: string) => {
     if (!selectedUser || !currentUser) return;
     const res = await fetch(`/api/users/${selectedUser}`, {
       method: 'PATCH',
@@ -166,7 +166,7 @@ const OrganizationsTab = () => {
     setAddingMemberToOrg(null);
   };
 
-  const handleRemoveMember = async (userId: number, organizationId: number) => {
+  const handleRemoveMember = async (userId: string, organizationId: string) => {
     if (!currentUser) return;
     await fetch(`/api/users/${userId}`, {
       method: 'PATCH',

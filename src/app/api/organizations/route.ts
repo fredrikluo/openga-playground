@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll } from '@/lib/db';
+import db, { getAll, generateId } from '@/lib/db';
 import type { Organization } from '@/lib/schema';
 import { addUserToOrganization } from '@/lib/user-organization-helpers';
 import { syncOrgCreated } from '@/lib/openfga-tuples';
@@ -37,27 +37,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'User ID is required' }, { status: 400 });
     }
 
+    const orgId = generateId();
+    const hiddenRootId = generateId();
+    const sharedFolderId = generateId();
+
     const transaction = db.transaction(() => {
-      const hiddenRootStmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, NULL, NULL)');
-      const hiddenRootInfo = hiddenRootStmt.run(`${name} Root`);
-      const hiddenRootId = hiddenRootInfo.lastInsertRowid;
-
-      const orgStmt = db.prepare('INSERT INTO organizations (name, root_folder_id) VALUES (?, ?)');
-      const orgInfo = orgStmt.run(name, hiddenRootId);
-      const orgId = orgInfo.lastInsertRowid;
-
-      const updateHiddenRootStmt = db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?');
-      updateHiddenRootStmt.run(orgId, hiddenRootId);
-
-      const sharedFolderStmt = db.prepare('INSERT INTO folders (name, parent_folder_id, organization_id) VALUES (?, ?, ?)');
-      sharedFolderStmt.run(`${name} Shared Folder`, hiddenRootId, orgId);
+      db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, NULL, NULL)').run(hiddenRootId, `${name} Root`);
+      db.prepare('INSERT INTO organizations (id, name, root_folder_id) VALUES (?, ?, ?)').run(orgId, name, hiddenRootId);
+      db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?').run(orgId, hiddenRootId);
+      db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, ?, ?)').run(sharedFolderId, `${name} Shared Folder`, hiddenRootId, orgId);
 
       return { id: orgId, name, root_folder_id: hiddenRootId };
     });
 
     const newOrg = transaction();
-    addUserToOrganization(userId, newOrg.id, userRole);
-    await syncOrgCreated(newOrg.id, newOrg.root_folder_id, userId);
+    addUserToOrganization(userId, orgId, userRole);
+    await syncOrgCreated(orgId, hiddenRootId, userId);
 
     return NextResponse.json(newOrg, { status: 201 });
   } catch (error) {

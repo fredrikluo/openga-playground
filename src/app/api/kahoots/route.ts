@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import db, { getAll } from '@/lib/db';
+import db, { getAll, generateId } from '@/lib/db';
 import type { Kahoot } from '@/lib/schema';
 import { syncKahootCreated } from '@/lib/openfga-tuples';
 
@@ -19,12 +19,13 @@ export async function POST(request: Request) {
     if (!name || !folder_id) {
       return NextResponse.json({ message: 'Name and folder_id are required' }, { status: 400 });
     }
-    const stmt = db.prepare('INSERT INTO kahoots (name, folder_id) VALUES (?, ?)');
-    const info = stmt.run(name, folder_id);
 
-    await syncKahootCreated(info.lastInsertRowid, folder_id);
+    const kahootId = generateId();
+    db.prepare('INSERT INTO kahoots (id, name, folder_id) VALUES (?, ?, ?)').run(kahootId, name, folder_id);
 
-    return NextResponse.json({ id: info.lastInsertRowid, name, folder_id }, { status: 201 });
+    await syncKahootCreated(kahootId, folder_id);
+
+    return NextResponse.json({ id: kahootId, name, folder_id }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
