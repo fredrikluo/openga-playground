@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
-import db, { getOne, getAll } from '@/lib/db';
-import type { Folder, Kahoot } from '@/lib/schema';
+import db from '@/lib/db';
+import { folderRepository, kahootRepository } from '@/lib/repositories';
 import { syncFolderMoved } from '@/lib/openfga-tuples';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const folder = getOne<Folder>('SELECT * FROM folders WHERE id = ?', id);
+    const folder = await folderRepository.getById(id);
     if (!folder) {
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
     }
-    const subfolders = getAll<Folder>('SELECT * FROM folders WHERE parent_folder_id = ?', id);
-    const kahoots = getAll<Kahoot>('SELECT * FROM kahoots WHERE folder_id = ?', id);
+    const subfolders = await folderRepository.getSubfolders(id);
+    const kahoots = await kahootRepository.getByFolder(id);
     return NextResponse.json({ ...folder, subfolders, kahoots });
   } catch (error) {
     console.error(error);
@@ -27,11 +27,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
     }
 
-    const oldFolder = getOne<Folder>('SELECT * FROM folders WHERE id = ?', id);
+    const oldFolder = await folderRepository.getById(id);
 
-    const stmt = db.prepare('UPDATE folders SET name = ?, parent_folder_id = ? WHERE id = ?');
-    const info = stmt.run(name, parent_folder_id, id);
-    if (info.changes === 0) {
+    const found = await folderRepository.update(id, name, parent_folder_id ?? null);
+    if (!found) {
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
     }
 
@@ -53,26 +52,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { id } = await context.params;
 
-    const deleteFolderAndContents = (folderId: string) => {
-      const subfolders = getAll<Pick<Folder, 'id'>>('SELECT id FROM folders WHERE parent_folder_id = ?', folderId);
-      for (const subfolder of subfolders) {
-        deleteFolderAndContents(subfolder.id);
-      }
-
-      db.prepare('DELETE FROM kahoots WHERE folder_id = ?').run(folderId);
-      db.prepare('DELETE FROM folders WHERE id = ?').run(folderId);
-    };
-
-    const transaction = db.transaction(() => {
-      const folder = db.prepare('SELECT id FROM folders WHERE id = ?').get(id) as Pick<Folder, 'id'> | undefined;
+    const info = await db.transaction(async () => {
+      const folder = await folderRepository.getById(id);
       if (!folder) {
         return { changes: 0 };
       }
-      deleteFolderAndContents(folder.id);
+      await folderRepository.deleteFolderRecursive(id);
       return { changes: 1 };
     });
-
-    const info = transaction();
 
     if (info.changes === 0) {
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });

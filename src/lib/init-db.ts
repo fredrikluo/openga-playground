@@ -1,7 +1,7 @@
 import db, { generateId } from './db';
 
-function initDb() {
-  db.exec(`
+async function initDb() {
+  await db.exec(`
     DROP TABLE IF EXISTS kahoots;
     DROP TABLE IF EXISTS folders;
     DROP TABLE IF EXISTS group_users;
@@ -73,10 +73,10 @@ function initDb() {
     const rootFolderId = generateId();
     const userId = generateId();
 
-    db.prepare('INSERT INTO organizations (id, name) VALUES (?, ?)').run(orgId, 'Default Organization');
-    db.prepare('INSERT INTO folders (id, name, organization_id) VALUES (?, ?, ?)').run(rootFolderId, 'Default Root Folder', orgId);
-    db.prepare('UPDATE organizations SET root_folder_id = ? WHERE id = ?').run(rootFolderId, orgId);
-    db.prepare('INSERT INTO users (id, name, email, organization_id, role) VALUES (?, ?, ?, ?, ?)').run(userId, 'Default User', 'user@example.com', orgId, 'admin');
+    await db.run('INSERT INTO organizations (id, name) VALUES (?, ?)', orgId, 'Default Organization');
+    await db.run('INSERT INTO folders (id, name, organization_id) VALUES (?, ?, ?)', rootFolderId, 'Default Root Folder', orgId);
+    await db.run('UPDATE organizations SET root_folder_id = ? WHERE id = ?', rootFolderId, orgId);
+    await db.run('INSERT INTO users (id, name, email, organization_id, role) VALUES (?, ?, ?, ?, ?)', userId, 'Default User', 'user@example.com', orgId, 'admin');
 
     console.log('Default data created successfully.');
   } catch (e) {

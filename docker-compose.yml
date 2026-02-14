@@ -9,6 +9,7 @@ services:
       - POSTGRES_DB=openfga
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+      - ./docker/create-databases.sh:/docker-entrypoint-initdb.d/create-databases.sh
     networks:
       - app-network
     healthcheck:
@@ -25,7 +26,9 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - DATABASE_ENGINE=${DATABASE_ENGINE:-sqlite}
       - DATABASE_PATH=/app/data/kahoot.db
+      - DATABASE_URL=postgres://openfga:openfga@postgres:5432/kahoot?sslmode=disable
       - OPENFGA_API_URL=http://openfga:8080
       - OPENFGA_STORE_ID=${OPENFGA_STORE_ID:-}
       - OPENFGA_MODEL_ID=${OPENFGA_MODEL_ID:-}

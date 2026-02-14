@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import db, { getAll, generateId } from '@/lib/db';
-import type { Kahoot } from '@/lib/schema';
+import { generateId } from '@/lib/db';
+import { kahootRepository } from '@/lib/repositories';
 import { syncKahootCreated } from '@/lib/openfga-tuples';
 
 export async function GET() {
   try {
-    const kahoots = getAll<Kahoot>('SELECT * FROM kahoots');
+    const kahoots = await kahootRepository.getAll();
     return NextResponse.json(kahoots);
   } catch (error) {
     console.error(error);
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     const kahootId = generateId();
-    db.prepare('INSERT INTO kahoots (id, name, folder_id) VALUES (?, ?, ?)').run(kahootId, name, folder_id);
+    await kahootRepository.create(kahootId, name, folder_id);
 
     await syncKahootCreated(kahootId, folder_id);
 

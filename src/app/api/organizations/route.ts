@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll, generateId } from '@/lib/db';
-import type { Organization } from '@/lib/schema';
+import db, { generateId } from '@/lib/db';
+import { organizationRepository, folderRepository } from '@/lib/repositories';
 import { addUserToOrganization } from '@/lib/user-organization-helpers';
 import { syncOrgCreated } from '@/lib/openfga-tuples';
 
@@ -10,16 +10,11 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
 
     if (userId) {
-      const organizations = getAll<Organization>(`
-        SELECT o.* FROM organizations o
-        JOIN user_organizations uo ON o.id = uo.organization_id
-        WHERE uo.user_id = ?
-        ORDER BY o.name
-      `, userId);
+      const organizations = await organizationRepository.getByUser(userId);
       return NextResponse.json(organizations);
     }
 
-    const organizations = getAll<Organization>('SELECT * FROM organizations ORDER BY name');
+    const organizations = await organizationRepository.getAll();
     return NextResponse.json(organizations);
   } catch (error) {
     console.error('Error fetching organizations:', error);
@@ -41,17 +36,16 @@ export async function POST(request: Request) {
     const hiddenRootId = generateId();
     const sharedFolderId = generateId();
 
-    const transaction = db.transaction(() => {
-      db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, NULL, NULL)').run(hiddenRootId, `${name} Root`);
-      db.prepare('INSERT INTO organizations (id, name, root_folder_id) VALUES (?, ?, ?)').run(orgId, name, hiddenRootId);
-      db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?').run(orgId, hiddenRootId);
-      db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, ?, ?)').run(sharedFolderId, `${name} Shared Folder`, hiddenRootId, orgId);
+    const newOrg = await db.transaction(async () => {
+      await folderRepository.create(hiddenRootId, `${name} Root`, null, null);
+      await organizationRepository.create(orgId, name, hiddenRootId);
+      await folderRepository.setOrganization(hiddenRootId, orgId);
+      await folderRepository.create(sharedFolderId, `${name} Shared Folder`, hiddenRootId, orgId);
 
       return { id: orgId, name, root_folder_id: hiddenRootId };
     });
 
-    const newOrg = transaction();
-    addUserToOrganization(userId, orgId, userRole);
+    await addUserToOrganization(userId, orgId, userRole);
     await syncOrgCreated(orgId, hiddenRootId, userId);
 
     return NextResponse.json(newOrg, { status: 201 });

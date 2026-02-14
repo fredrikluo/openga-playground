@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import db, { getOne, getAll } from '@/lib/db';
-import type { Organization } from '@/lib/schema';
+import db from '@/lib/db';
+import { organizationRepository, userOrganizationRepository, kahootRepository, folderRepository, groupRepository } from '@/lib/repositories';
 import { syncOrgDeleted } from '@/lib/openfga-tuples';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const organization = getOne<Organization>('SELECT * FROM organizations WHERE id = ?', id);
+    const organization = await organizationRepository.getById(id);
     if (!organization) {
       return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
     }
@@ -24,9 +24,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!name) {
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
     }
-    const stmt = db.prepare('UPDATE organizations SET name = ? WHERE id = ?');
-    const info = stmt.run(name, id);
-    if (info.changes === 0) {
+    const found = await organizationRepository.updateName(id, name);
+    if (!found) {
       return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
     }
     return NextResponse.json({ id, name });
@@ -40,32 +39,27 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { id } = await context.params;
 
-    const orgMembers = getAll<{ user_id: string }>(
-      'SELECT user_id FROM user_organizations WHERE organization_id = ?', id
-    );
+    const orgMembers = await userOrganizationRepository.getMemberUserIds(id);
 
-    const transaction = db.transaction(() => {
-      const org = getOne<Organization>('SELECT * FROM organizations WHERE id = ?', id);
+    const info = await db.transaction(async () => {
+      const org = await organizationRepository.getById(id);
       if (!org) {
         return { changes: 0 };
       }
 
-      db.prepare(`
-        DELETE FROM kahoots WHERE folder_id IN (SELECT id FROM folders WHERE organization_id = ?)
-      `).run(id);
-      db.prepare('UPDATE organizations SET root_folder_id = NULL WHERE id = ?').run(id);
-      db.prepare('DELETE FROM folders WHERE organization_id = ?').run(id);
-      db.prepare('DELETE FROM groups WHERE organization_id = ?').run(id);
-      const info = db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
-      return info;
+      await kahootRepository.deleteByOrganization(id);
+      await organizationRepository.clearRootFolder(id);
+      await folderRepository.deleteByOrganization(id);
+      await groupRepository.deleteByOrganization(id);
+      await organizationRepository.delete(id);
+      return { changes: 1 };
     });
 
-    const info = transaction();
     if (info.changes === 0) {
       return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
     }
 
-    await syncOrgDeleted(id, orgMembers.map(m => m.user_id));
+    await syncOrgDeleted(id, orgMembers);
 
     return NextResponse.json({ message: 'Organization deleted successfully' });
   } catch (error) {

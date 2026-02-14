@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll, getOne, generateId } from '@/lib/db';
-import type { Folder } from '@/lib/schema';
+import { generateId } from '@/lib/db';
+import { folderRepository } from '@/lib/repositories';
 import { writeFolderTuples } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'organizationId is required' }, { status: 400 });
     }
 
-    const folders = getAll<Folder>('SELECT * FROM folders WHERE organization_id = ?', organizationId);
+    const folders = await folderRepository.getByOrganization(organizationId);
     return NextResponse.json(folders);
   } catch (error) {
     console.error(error);
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     let orgId = organization_id;
     if (parent_folder_id) {
-      const parentFolder = getOne<Folder>('SELECT organization_id FROM folders WHERE id = ?', parent_folder_id);
+      const parentFolder = await folderRepository.getById(parent_folder_id);
       if (parentFolder) {
         orgId = parentFolder.organization_id;
       }
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     const folderId = generateId();
-    db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, ?, ?)').run(folderId, name, parent_folder_id, orgId);
+    await folderRepository.create(folderId, name, parent_folder_id, orgId);
 
     await writeFolderTuples(folderId, orgId, parent_folder_id || null);
 

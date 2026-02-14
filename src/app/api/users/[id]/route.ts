@@ -1,13 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getOne } from '@/lib/db';
-import type { User } from '@/lib/schema';
+import { userRepository, userOrganizationRepository } from '@/lib/repositories';
 import { addUserToOrganization, removeUserFromOrganization } from '@/lib/user-organization-helpers';
 import { syncUserAddedToOrg, syncUserRemovedFromOrg } from '@/lib/openfga-tuples';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const user = getOne<User>('SELECT * FROM users WHERE id = ?', id);
+    const user = await userRepository.getById(id);
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
@@ -25,14 +24,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const { id } = await context.params;
     const { role, organization_id, action } = await request.json();
 
-    const targetUser = getOne<User>('SELECT * FROM users WHERE id = ?', id);
+    const targetUser = await userRepository.getById(id);
     if (!targetUser) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
     if (action === 'add_to_org' && organization_id) {
       try {
-        addUserToOrganization(id, organization_id, role || 'member');
+        await addUserToOrganization(id, organization_id, role || 'member');
       } catch (orgError: unknown) {
         if (orgError instanceof Error && orgError.message.includes('A user with this name already exists')) {
           return NextResponse.json({ message: orgError.message }, { status: 409 });
@@ -45,7 +44,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     }
 
     if (action === 'remove_from_org' && organization_id) {
-      removeUserFromOrganization(id, organization_id);
+      await removeUserFromOrganization(id, organization_id);
       await syncUserRemovedFromOrg(id, organization_id);
       return NextResponse.json({ message: 'User removed from organization' });
     }
@@ -56,12 +55,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         return NextResponse.json({ message: 'Invalid role' }, { status: 400 });
       }
 
-      const stmt = db.prepare(`
-        UPDATE user_organizations
-        SET role = ?
-        WHERE user_id = ? AND organization_id = ?
-      `);
-      stmt.run(role, id, organization_id);
+      await userOrganizationRepository.updateRole(id, organization_id, role);
       return NextResponse.json({ message: 'User role updated' });
     }
 
@@ -81,10 +75,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ message: 'Name and email are required' }, { status: 400 });
     }
 
-    const stmt = db.prepare('UPDATE users SET name = ?, email = ? WHERE id = ?');
-    const info = stmt.run(name, email, id);
+    const found = await userRepository.update(id, name, email);
 
-    if (info.changes === 0) {
+    if (!found) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
@@ -99,22 +92,19 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     const { id } = await context.params;
 
-    const user = getOne<User>('SELECT * FROM users WHERE id = ?', id);
+    const user = await userRepository.getById(id);
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    const userOrgs = db.prepare(`
-      SELECT organization_id FROM user_organizations WHERE user_id = ?
-    `).all(id) as { organization_id: string }[];
+    const orgIds = await userOrganizationRepository.getOrgIdsByUser(id);
 
-    for (const org of userOrgs) {
-      removeUserFromOrganization(id, org.organization_id);
-      await syncUserRemovedFromOrg(id, org.organization_id);
+    for (const orgId of orgIds) {
+      await removeUserFromOrganization(id, orgId);
+      await syncUserRemovedFromOrg(id, orgId);
     }
 
-    const stmt = db.prepare('DELETE FROM users WHERE id = ?');
-    stmt.run(id);
+    await userRepository.delete(id);
 
     return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error) {

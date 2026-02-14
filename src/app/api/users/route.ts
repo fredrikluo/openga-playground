@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
-import db, { getAll, generateId } from '@/lib/db';
-import type { User } from '@/lib/schema';
+import db, { generateId } from '@/lib/db';
+import { userRepository, organizationRepository, folderRepository } from '@/lib/repositories';
 import { addUserToOrganization } from '@/lib/user-organization-helpers';
 import { syncOrgCreated, syncUserAddedToOrg } from '@/lib/openfga-tuples';
 
@@ -11,26 +11,16 @@ export async function GET(request: NextRequest) {
     const unassigned = searchParams.get('unassigned');
 
     if (unassigned === 'true') {
-      const users = getAll<User>(`
-        SELECT DISTINCT u.* FROM users u
-        LEFT JOIN user_organizations uo ON u.id = uo.user_id
-        WHERE uo.user_id IS NULL
-      `);
+      const users = await userRepository.getUnassigned();
       return NextResponse.json(users);
     }
 
     if (organizationId) {
-      const users = getAll<User>(`
-        SELECT DISTINCT u.id, u.name, u.email
-        FROM users u
-        JOIN user_organizations uo ON u.id = uo.user_id
-        WHERE uo.organization_id = ?
-        ORDER BY u.name
-      `, organizationId);
+      const users = await userRepository.getByOrganization(organizationId);
       return NextResponse.json(users);
     }
 
-    const users = getAll<User>('SELECT * FROM users ORDER BY name');
+    const users = await userRepository.getAll();
     return NextResponse.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -53,37 +43,36 @@ export async function POST(request: Request) {
       const hiddenRootId = generateId();
       const sharedFolderId = generateId();
 
-      const orgTransaction = db.transaction(() => {
-        db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, NULL, NULL)').run(hiddenRootId, `${newOrganization} Root`);
-        db.prepare('INSERT INTO organizations (id, name, root_folder_id) VALUES (?, ?, ?)').run(newOrgId, newOrganization, hiddenRootId);
-        db.prepare('UPDATE folders SET organization_id = ? WHERE id = ?').run(newOrgId, hiddenRootId);
-        db.prepare('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES (?, ?, ?, ?)').run(sharedFolderId, `${newOrganization} Shared Folder`, hiddenRootId, newOrgId);
+      const result = await db.transaction(async () => {
+        await folderRepository.create(hiddenRootId, `${newOrganization} Root`, null, null);
+        await organizationRepository.create(newOrgId, newOrganization, hiddenRootId);
+        await folderRepository.setOrganization(hiddenRootId, newOrgId);
+        await folderRepository.create(sharedFolderId, `${newOrganization} Shared Folder`, hiddenRootId, newOrgId);
 
         return { orgId: newOrgId, rootFolderId: hiddenRootId };
       });
-      const result = orgTransaction();
       orgId = result.orgId;
     }
 
     // Create user
     const userId = generateId();
-    db.prepare('INSERT INTO users (id, name, email) VALUES (?, ?, ?)').run(userId, name, email);
+    await userRepository.create(userId, name, email);
     const newUser = { id: userId, name, email };
 
     // Add to organization if provided (this creates the personal folder)
     if (orgId) {
       try {
-        addUserToOrganization(userId, orgId, role);
+        await addUserToOrganization(userId, orgId, role);
       } catch (orgError: unknown) {
         if (orgError instanceof Error && orgError.message.includes('A user with this name already exists')) {
-          db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+          await userRepository.delete(userId);
           return NextResponse.json({ message: orgError.message }, { status: 409 });
         }
         throw orgError;
       }
 
       if (newOrganization) {
-        const org = db.prepare('SELECT root_folder_id FROM organizations WHERE id = ?').get(orgId) as { root_folder_id: string } | undefined;
+        const org = await organizationRepository.getById(orgId);
         if (org) {
           await syncOrgCreated(orgId, org.root_folder_id, userId);
         }

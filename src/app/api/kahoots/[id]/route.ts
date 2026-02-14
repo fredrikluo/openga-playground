@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import db, { getOne } from '@/lib/db';
-import type { Kahoot } from '@/lib/schema';
+import { kahootRepository } from '@/lib/repositories';
 import { syncKahootUpdated, syncKahootDeleted } from '@/lib/openfga-tuples';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const kahoot = getOne<Kahoot>('SELECT * FROM kahoots WHERE id = ?', id);
+    const kahoot = await kahootRepository.getById(id);
     if (!kahoot) {
       return NextResponse.json({ message: 'Kahoot not found' }, { status: 404 });
     }
@@ -25,11 +24,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Name and folder_id are required' }, { status: 400 });
     }
 
-    const oldKahoot = getOne<Kahoot>('SELECT * FROM kahoots WHERE id = ?', id);
+    const oldKahoot = await kahootRepository.getById(id);
 
-    const stmt = db.prepare('UPDATE kahoots SET name = ?, folder_id = ? WHERE id = ?');
-    const info = stmt.run(name, folder_id, id);
-    if (info.changes === 0) {
+    const found = await kahootRepository.update(id, name, folder_id);
+    if (!found) {
       return NextResponse.json({ message: 'Kahoot not found' }, { status: 404 });
     }
 
@@ -48,17 +46,15 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { id } = await context.params;
 
-    const kahoot = getOne<Kahoot>('SELECT * FROM kahoots WHERE id = ?', id);
+    const kahoot = await kahootRepository.getById(id);
 
-    const stmt = db.prepare('DELETE FROM kahoots WHERE id = ?');
-    const info = stmt.run(id);
-    if (info.changes === 0) {
+    if (!kahoot) {
       return NextResponse.json({ message: 'Kahoot not found' }, { status: 404 });
     }
 
-    if (kahoot) {
-      await syncKahootDeleted(id, kahoot.folder_id);
-    }
+    await kahootRepository.delete(id);
+
+    await syncKahootDeleted(id, kahoot.folder_id);
 
     return NextResponse.json({ message: 'Kahoot deleted successfully' });
   } catch (error) {
