@@ -87,7 +87,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
 
     // Clean up org member tuples in OpenFGA
     for (const member of orgMembers) {
-      await deleteOrgMemberTuple(member.user_id, id);
+      await deleteOrgMemberTuple(member.user_id, Number(id));
     }
 
     return NextResponse.json({ message: 'Organization deleted successfully' });

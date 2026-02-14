@@ -33,7 +33,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     // Add user to organization
     if (action === 'add_to_org' && organization_id) {
       try {
-        addUserToOrganization(id, organization_id, role || 'member');
+        addUserToOrganization(Number(id), organization_id, role || 'member');
       } catch (orgError: unknown) {
         if (orgError instanceof Error && orgError.message.includes('A user with this name already exists')) {
           return NextResponse.json({ message: orgError.message }, { status: 409 });
@@ -42,7 +42,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       }
 
       // Sync OpenFGA: org membership + personal folder tuple
-      await writeOrgMemberTuple(id, organization_id);
+      await writeOrgMemberTuple(Number(id), organization_id);
       const org = getOne<Organization>('SELECT root_folder_id FROM organizations WHERE id = ?', organization_id);
       if (org) {
         const personalFolder = getOne<Folder>(
@@ -59,8 +59,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     // Remove user from organization
     if (action === 'remove_from_org' && organization_id) {
-      removeUserFromOrganization(id, organization_id);
-      await deleteOrgMemberTuple(id, organization_id);
+      removeUserFromOrganization(Number(id), organization_id);
+      await deleteOrgMemberTuple(Number(id), organization_id);
       return NextResponse.json({ message: 'User removed from organization' });
     }
 
@@ -127,8 +127,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     // Remove user from all organizations (this deletes their personal folders)
     for (const org of userOrgs) {
-      removeUserFromOrganization(id, org.organization_id);
-      await deleteOrgMemberTuple(id, org.organization_id);
+      removeUserFromOrganization(Number(id), org.organization_id);
+      await deleteOrgMemberTuple(Number(id), org.organization_id);
     }
 
     // Now delete the user
