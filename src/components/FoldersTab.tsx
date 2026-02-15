@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import FolderView from './FolderView';
+import FolderPickerModal from './FolderPickerModal';
 import { List, Grid, X, Folder as FolderIcon, FileText, Eye, EyeOff } from 'lucide-react';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useUser } from '@/context/UserContext';
@@ -55,12 +56,12 @@ const FoldersTab = () => {
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
 
   // Permission check for the current folder (for create permission)
-  const { permissions: currentFolderPerms } = usePermissions(
+  const { permissions: currentFolderPerms, loading: createPermLoading } = usePermissions(
     currentUser?.id,
     'folder',
     currentFolderId
   );
-  const canCreateInCurrentFolder = !currentFolderId || currentFolderPerms.can_create_effective;
+  const canCreateInCurrentFolder = !currentFolderId || createPermLoading || currentFolderPerms.can_create_effective;
 
   // Permission hooks for the selected item
   const { permissions, loading: permLoading } = usePermissions(
@@ -76,6 +77,10 @@ const FoldersTab = () => {
   // Full visibility: on = show all (dim non-viewable), off = hide non-viewable (default)
   const [fullVisibility, setFullVisibility] = useState(false);
   const [viewableItems, setViewableItems] = useState<Record<string, boolean>>({});
+
+  // Move modal state
+  const [movingItem, setMovingItem] = useState<{ type: 'folder' | 'kahoot'; id: string; name: string; parentId: string | null } | null>(null);
+  const [rootFolderId, setRootFolderId] = useState<string>('');
 
   // Users and groups for role assignment
   const [orgUsers, setOrgUsers] = useState<User[]>([]);
@@ -178,6 +183,7 @@ const FoldersTab = () => {
       const orgRes = await fetch(`/api/organizations/${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
       const orgData = await orgRes.json();
       const hiddenRootId = orgData.root_folder_id;
+      setRootFolderId(hiddenRootId);
 
       const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
       const data = await res.json();
@@ -298,7 +304,25 @@ const FoldersTab = () => {
     resetForm();
   };
 
-  const handleEdit = (folder: Folder) => {
+  const handleEdit = async (folder: Folder) => {
+    setError('');
+    if (currentUser) {
+      try {
+        const res = await fetch(
+          `/api/permissions/check?user=user:${currentUser.id}&relation=can_edit_effective&object=folder:${folder.id}`,
+          { headers: getHeaders(currentUser.id) }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allowed) {
+            setError('Permission denied: you cannot edit this folder.');
+            return;
+          }
+        }
+      } catch {
+        // If check fails, let the backend enforce
+      }
+    }
     setEditingFolder(folder);
     setName(folder.name);
   };
@@ -336,6 +360,22 @@ const FoldersTab = () => {
   };
 
   const handleDelete = async (id: string) => {
+    setError('');
+    if (currentUser) {
+      try {
+        const res = await fetch(
+          `/api/permissions/check?user=user:${currentUser.id}&relation=can_remove_effective&object=folder:${id}`,
+          { headers: getHeaders(currentUser.id) }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allowed) {
+            setError('Permission denied: you cannot delete this folder.');
+            return;
+          }
+        }
+      } catch { /* let backend enforce */ }
+    }
     const res = await fetch(`/api/folders/${id}`, {
       method: 'DELETE',
       headers: getHeaders(currentUser?.id),
@@ -357,6 +397,22 @@ const FoldersTab = () => {
   };
 
   const handleKahootDelete = async (id: string) => {
+    setError('');
+    if (currentUser) {
+      try {
+        const res = await fetch(
+          `/api/permissions/check?user=user:${currentUser.id}&relation=can_remove_effective&object=document:${id}`,
+          { headers: getHeaders(currentUser.id) }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allowed) {
+            setError('Permission denied: you cannot delete this kahoot.');
+            return;
+          }
+        }
+      } catch { /* let backend enforce */ }
+    }
     const res = await fetch(`/api/kahoots/${id}`, {
       method: 'DELETE',
       headers: getHeaders(currentUser?.id),
@@ -395,6 +451,97 @@ const FoldersTab = () => {
     }
   };
 
+  // Resolve FGA user string (e.g. "user:uuid" or "group:uuid#member") to a display name
+  const resolveAssigneeName = (fgaUser: string): string => {
+    if (fgaUser.startsWith('user:')) {
+      const id = fgaUser.replace('user:', '');
+      const user = orgUsers.find(u => u.id === id);
+      return user ? `user: ${user.name}` : fgaUser;
+    }
+    if (fgaUser.startsWith('group:')) {
+      const id = fgaUser.replace('group:', '').replace('#member', '');
+      const group = orgGroups.find(g => g.id === id);
+      return group ? `group: ${group.name}` : fgaUser;
+    }
+    if (fgaUser.startsWith('organization:')) {
+      return 'org: All members';
+    }
+    return fgaUser;
+  };
+
+  const handleFolderMove = async (folder: Folder) => {
+    setError('');
+    if (currentUser) {
+      try {
+        const res = await fetch(
+          `/api/permissions/check?user=user:${currentUser.id}&relation=can_remove_effective&object=folder:${folder.id}`,
+          { headers: getHeaders(currentUser.id) }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allowed) {
+            setError('Permission denied: you cannot move this folder.');
+            return;
+          }
+        }
+      } catch { /* let backend enforce */ }
+    }
+    setMovingItem({ type: 'folder', id: folder.id, name: folder.name, parentId: folder.parent_folder_id });
+  };
+
+  const handleKahootMove = async (kahoot: Kahoot) => {
+    setError('');
+    if (currentUser) {
+      try {
+        const res = await fetch(
+          `/api/permissions/check?user=user:${currentUser.id}&relation=can_remove_effective&object=document:${kahoot.id}`,
+          { headers: getHeaders(currentUser.id) }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allowed) {
+            setError('Permission denied: you cannot move this kahoot.');
+            return;
+          }
+        }
+      } catch { /* let backend enforce */ }
+    }
+    setMovingItem({ type: 'kahoot', id: kahoot.id, name: kahoot.name, parentId: currentFolderId });
+  };
+
+  const handleMoveConfirm = async (destFolderId: string) => {
+    if (!movingItem) return;
+    setError('');
+
+    if (movingItem.type === 'folder') {
+      const folder = allFolders.find(f => f.id === movingItem.id);
+      if (!folder) return;
+      const res = await fetch(`/api/folders/${movingItem.id}`, {
+        method: 'PUT',
+        headers: apiHeaders(currentUser?.id),
+        body: JSON.stringify({ name: folder.name, parent_folder_id: destFolderId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.message || 'Failed to move folder');
+      }
+    } else {
+      const res = await fetch(`/api/kahoots/${movingItem.id}`, {
+        method: 'PUT',
+        headers: apiHeaders(currentUser?.id),
+        body: JSON.stringify({ name: movingItem.name, folder_id: destFolderId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.message || 'Failed to move kahoot');
+      }
+    }
+
+    setMovingItem(null);
+    fetchFolderContent(currentFolderId);
+    fetchAllFolders();
+  };
+
   if (!currentOrganization) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -410,8 +557,9 @@ const FoldersTab = () => {
           {editingFolder ? 'Edit Folder' : 'Add a New Folder'}
         </h2>
         {error && (
-          <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">
-            {error}
+          <div className="flex items-center justify-between p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">
+            <span>{error}</span>
+            <button onClick={() => setError('')} className="ml-2 text-red-500 hover:text-red-700 font-bold text-lg leading-none">&times;</button>
           </div>
         )}
         {!canCreateInCurrentFolder && !editingFolder && (
@@ -505,6 +653,8 @@ const FoldersTab = () => {
                 onFolderSelect={handleFolderSelect}
                 onKahootSelect={handleKahootSelect}
                 onKahootDelete={handleKahootDelete}
+                onFolderMove={handleFolderMove}
+                onKahootMove={handleKahootMove}
                 selectedItemId={selectedItem?.id}
                 visibilityMode={fullVisibility ? 'show-all' : 'hide'}
                 viewableItems={viewableItems}
@@ -585,34 +735,37 @@ const FoldersTab = () => {
               </div>
             </div>
 
-            {/* Role assignments */}
+            {/* Shared with */}
             <div>
-              <h4 className="text-sm font-semibold text-purple-700 mb-2">Role assignments</h4>
+              <h4 className="text-sm font-semibold text-purple-700 mb-2">Shared with</h4>
               {assignments.length === 0 ? (
-                <p className="text-sm text-gray-400">No roles assigned</p>
+                <p className="text-sm text-gray-400">No sharing configured</p>
               ) : (
                 <ul className="space-y-1">
                   {assignments.map((a, i) => (
                     <li key={i} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
                       <span>
-                        <span className="font-mono text-xs">{a.user}</span>
+                        <span className="text-xs font-medium">{resolveAssigneeName(a.user)}</span>
                         <span className="ml-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">{a.relation}</span>
                       </span>
+                      {permissions.can_set_visibility_effective && (
                       <button
                         onClick={() => removeRole(a.user, a.relation)}
                         className="text-red-500 hover:text-red-700 text-xs"
                       >
                         Remove
                       </button>
+                      )}
                     </li>
                   ))}
                 </ul>
               )}
             </div>
 
-            {/* Assign role */}
+            {/* Share to */}
+            {permissions.can_set_visibility_effective ? (
             <div>
-              <h4 className="text-sm font-semibold text-purple-700 mb-2">Assign role</h4>
+              <h4 className="text-sm font-semibold text-purple-700 mb-2">Share to</h4>
               <div className="space-y-2">
                 <div className="flex gap-1">
                   <button
@@ -676,9 +829,25 @@ const FoldersTab = () => {
                 </div>
               </div>
             </div>
+            ) : (
+            <p className="text-xs text-gray-400">You do not have permission to change sharing.</p>
+            )}
           </div>
         )}
       </div>
+
+      {/* Move modal */}
+      {movingItem && rootFolderId && (
+        <FolderPickerModal
+          folders={allFolders}
+          rootFolderId={rootFolderId}
+          excludeFolderId={movingItem.type === 'folder' ? movingItem.id : undefined}
+          currentParentId={movingItem.parentId}
+          onSelect={handleMoveConfirm}
+          onClose={() => setMovingItem(null)}
+          title={`Move "${movingItem.name}"`}
+        />
+      )}
     </div>
   );
 };

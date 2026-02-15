@@ -18,24 +18,46 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+    const userId = getCurrentUserId(request);
     const { name, folder_id } = await request.json();
     if (!name || !folder_id) {
       return NextResponse.json({ message: 'Name and folder_id are required' }, { status: 400 });
     }
 
     const oldKahoot = await kahootRepository.getById(id);
+    if (!oldKahoot) {
+      return NextResponse.json({ message: 'Kahoot not found' }, { status: 404 });
+    }
+
+    // Permission check for edit (rename)
+    if (userId && oldKahoot.name !== name) {
+      const canEdit = await check(`user:${userId}`, 'can_edit_effective', `document:${id}`);
+      if (!canEdit) {
+        return NextResponse.json({ message: 'Permission denied: cannot edit this kahoot' }, { status: 403 });
+      }
+    }
+
+    // Permission checks for move (folder changed)
+    if (userId && oldKahoot.folder_id !== folder_id) {
+      const canRemove = await check(`user:${userId}`, 'can_remove_effective', `document:${id}`);
+      if (!canRemove) {
+        return NextResponse.json({ message: 'Permission denied: cannot move this kahoot' }, { status: 403 });
+      }
+      const canCreateInDest = await check(`user:${userId}`, 'can_create_effective', `folder:${folder_id}`);
+      if (!canCreateInDest) {
+        return NextResponse.json({ message: 'Permission denied: cannot move to destination folder' }, { status: 403 });
+      }
+    }
 
     const found = await kahootRepository.update(id, name, folder_id);
     if (!found) {
       return NextResponse.json({ message: 'Kahoot not found' }, { status: 404 });
     }
 
-    if (oldKahoot) {
-      await syncKahootUpdated(id, oldKahoot.folder_id, folder_id);
-    }
+    await syncKahootUpdated(id, oldKahoot.folder_id, folder_id);
 
     return NextResponse.json({ id, name, folder_id });
   } catch (error) {

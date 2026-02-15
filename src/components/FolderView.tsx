@@ -1,6 +1,6 @@
 'use client';
 
-import { Folder, FileText, ArrowLeft, Pencil, Trash2, Info } from 'lucide-react';
+import { Folder, FileText, ArrowLeft, Pencil, Trash2, Info, MoveRight } from 'lucide-react';
 
 interface Kahoot {
   id: string;
@@ -26,6 +26,8 @@ interface FolderViewProps {
   onFolderSelect?: (folder: SubFolder) => void;
   onKahootSelect?: (kahoot: Kahoot) => void;
   onKahootDelete?: (kahootId: string) => void;
+  onFolderMove?: (folder: SubFolder) => void;
+  onKahootMove?: (kahoot: Kahoot) => void;
   selectedItemId?: string;
   permissions?: Record<string, boolean>;
   visibilityMode?: 'off' | 'show-all' | 'hide';
@@ -44,6 +46,8 @@ export default function FolderView({
   onFolderSelect,
   onKahootSelect,
   onKahootDelete,
+  onFolderMove,
+  onKahootMove,
   selectedItemId,
   visibilityMode = 'off',
   viewableItems = {},
@@ -101,6 +105,15 @@ export default function FolderView({
                 >
                   <Pencil size={14} className="text-gray-500" />
                 </button>
+                {onFolderMove && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onFolderMove(folder); }}
+                  className="p-1 rounded-full hover:bg-gray-200"
+                  aria-label={`Move ${folder.name}`}
+                >
+                  <MoveRight size={14} className="text-gray-500" />
+                </button>
+                )}
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete(folder.id); }}
                   className="p-1 rounded-full hover:bg-gray-200"
@@ -132,6 +145,15 @@ export default function FolderView({
                   >
                     <Info size={14} className="text-purple-500" />
                   </button>
+                  {onKahootMove && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onKahootMove(kahoot); }}
+                    className="p-1 rounded-full hover:bg-gray-200"
+                    aria-label={`Move ${kahoot.name}`}
+                  >
+                    <MoveRight size={14} className="text-gray-500" />
+                  </button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); onKahootDelete(kahoot.id); }}
                     className="p-1 rounded-full hover:bg-gray-200"
@@ -171,6 +193,14 @@ export default function FolderView({
                 >
                   <Pencil size={14} />
                 </button>
+                {onFolderMove && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onFolderMove(folder); }}
+                  className="p-1.5 rounded-full hover:bg-gray-200"
+                >
+                  <MoveRight size={14} />
+                </button>
+                )}
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete(folder.id); }}
                   className="p-1.5 rounded-full hover:bg-gray-200"
@@ -192,14 +222,24 @@ export default function FolderView({
             >
               <FileText size={22} className="mr-3 text-green-500 flex-shrink-0" />
               <span className="text-base font-medium text-gray-800 flex-grow truncate">{kahoot.name}</span>
-              {onKahootDelete && (
+              {(onKahootDelete || onKahootMove) && (
                 <div className="flex space-x-1 flex-shrink-0">
+                  {onKahootMove && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onKahootMove(kahoot); }}
+                    className="p-1.5 rounded-full hover:bg-gray-200"
+                  >
+                    <MoveRight size={14} />
+                  </button>
+                  )}
+                  {onKahootDelete && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onKahootDelete(kahoot.id); }}
                     className="p-1.5 rounded-full hover:bg-gray-200"
                   >
                     <Trash2 size={14} />
                   </button>
+                  )}
                 </div>
               )}
             </li>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface PermissionResult {
   can_view_effective: boolean;
@@ -29,15 +29,21 @@ export function usePermissions(
   objectId: string | null | undefined
 ) {
   const [permissions, setPermissions] = useState<PermissionResult>(DEFAULT_PERMISSIONS);
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const loadedKeyRef = useRef<string | null>(null);
+
+  // Build a key representing the current parameters
+  const currentKey = userId && objectId ? `${userId}:${objectType}:${objectId}` : null;
 
   const fetchPermissions = useCallback(async () => {
     if (!userId || !objectId) {
       setPermissions(DEFAULT_PERMISSIONS);
+      loadedKeyRef.current = null;
       return;
     }
 
-    setLoading(true);
+    const key = `${userId}:${objectType}:${objectId}`;
+    setFetching(true);
     try {
       const res = await fetch(
         `/api/permissions/object?user=user:${userId}&object=${objectType}:${objectId}`
@@ -45,18 +51,23 @@ export function usePermissions(
       if (res.ok) {
         const data = await res.json();
         setPermissions({ ...DEFAULT_PERMISSIONS, ...data.permissions });
+        loadedKeyRef.current = key;
       }
     } catch (error) {
       console.error('Error fetching permissions:', error);
       setPermissions(DEFAULT_PERMISSIONS);
+      loadedKeyRef.current = key;
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
   }, [userId, objectType, objectId]);
 
   useEffect(() => {
     fetchPermissions();
   }, [fetchPermissions]);
+
+  // Consider loading if we're fetching OR if params changed and we haven't fetched for the new params yet
+  const loading = fetching || (currentKey !== null && loadedKeyRef.current !== currentKey);
 
   return { permissions, loading, refetch: fetchPermissions };
 }

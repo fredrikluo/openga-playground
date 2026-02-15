@@ -21,22 +21,46 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+    const userId = getCurrentUserId(request);
     const { name, parent_folder_id } = await request.json();
     if (!name) {
       return NextResponse.json({ message: 'Name is required' }, { status: 400 });
     }
 
     const oldFolder = await folderRepository.getById(id);
+    if (!oldFolder) {
+      return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
+    }
+
+    // Permission check for edit (rename)
+    if (userId && oldFolder.name !== name) {
+      const canEdit = await check(`user:${userId}`, 'can_edit_effective', `folder:${id}`);
+      if (!canEdit) {
+        return NextResponse.json({ message: 'Permission denied: cannot edit this folder' }, { status: 403 });
+      }
+    }
+
+    // Permission checks for move (parent changed)
+    if (userId && parent_folder_id && oldFolder.parent_folder_id !== parent_folder_id) {
+      const canRemoveFromSource = await check(`user:${userId}`, 'can_remove_effective', `folder:${id}`);
+      if (!canRemoveFromSource) {
+        return NextResponse.json({ message: 'Permission denied: cannot move this folder' }, { status: 403 });
+      }
+      const canCreateInDest = await check(`user:${userId}`, 'can_create_effective', `folder:${parent_folder_id}`);
+      if (!canCreateInDest) {
+        return NextResponse.json({ message: 'Permission denied: cannot move to destination folder' }, { status: 403 });
+      }
+    }
 
     const found = await folderRepository.update(id, name, parent_folder_id ?? null);
     if (!found) {
       return NextResponse.json({ message: 'Folder not found' }, { status: 404 });
     }
 
-    if (oldFolder) {
+    if (oldFolder.parent_folder_id !== (parent_folder_id ?? null)) {
       await syncFolderMoved(id, oldFolder.parent_folder_id, parent_folder_id ?? null);
     }
 
