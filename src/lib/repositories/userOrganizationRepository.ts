@@ -37,6 +37,14 @@ export const userOrganizationRepository = {
     );
   },
 
+  async getRole(userId: string, orgId: string): Promise<string | null> {
+    const row = await db.getOne<{ role: string }>(
+      'SELECT role FROM user_organizations WHERE user_id = $1 AND organization_id = $2',
+      userId, orgId
+    );
+    return row?.role ?? null;
+  },
+
   async hasDuplicateName(userName: string, orgId: string, excludeUserId: string): Promise<boolean> {
     const existing = await db.getOne<{ id: string }>(`
       SELECT u.id FROM users u

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { check } from '@/lib/openfga';
+import { checkWithPolicy } from '@/lib/policy';
 
 // Single permission check
 // GET /api/permissions/check?user=user:1&relation=can_view_effective&object=folder:5
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const allowed = await check(user, relation, object);
+    const allowed = await checkWithPolicy(user, relation, object);
     return NextResponse.json({ allowed });
   } catch (error) {
     console.error('Permission check error:', error);
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     const results = await Promise.all(
       checks.map(async (c: { user: string; relation: string; object: string }) => {
-        const allowed = await check(c.user, c.relation, c.object);
+        const allowed = await checkWithPolicy(c.user, c.relation, c.object);
         return { ...c, allowed };
       })
     );

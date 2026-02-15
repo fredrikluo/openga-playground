@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { check } from '@/lib/openfga';
+import { checkWithPolicy } from '@/lib/policy';
 
 const FOLDER_PERMISSIONS = [
   'can_view_effective',
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const results: Record<string, boolean> = {};
     await Promise.all(
       permissions.map(async (perm) => {
-        results[perm] = await check(user, perm, object);
+        results[perm] = await checkWithPolicy(user, perm, object);
       })
     );
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kahootRepository } from '@/lib/repositories';
 import { generateId } from '@/lib/db';
 import { syncKahootCreated } from '@/lib/openfga-tuples';
-import { check } from '@/lib/openfga';
+import { checkWithPolicy as check } from '@/lib/policy';
 import { getCurrentUserId } from '@/lib/auth';
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {

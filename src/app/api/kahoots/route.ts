@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { generateId } from '@/lib/db';
 import { kahootRepository } from '@/lib/repositories';
 import { syncKahootCreated } from '@/lib/openfga-tuples';
-import { check } from '@/lib/openfga';
+import { checkWithPolicy as check } from '@/lib/policy';
 import { getCurrentUserId } from '@/lib/auth';
 
 export async function GET() {
