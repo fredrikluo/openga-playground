@@ -82,6 +82,9 @@ const FoldersTab = () => {
   const [movingItem, setMovingItem] = useState<{ type: 'folder' | 'kahoot'; id: string; name: string; parentId: string | null } | null>(null);
   const [rootFolderId, setRootFolderId] = useState<string>('');
 
+  // Shared with me
+  const [sharedWithMe, setSharedWithMe] = useState<{ folders: { id: string; name: string; relation: string }[]; kahoots: { id: string; name: string; relation: string }[] } | null>(null);
+
   // Users and groups for role assignment
   const [orgUsers, setOrgUsers] = useState<User[]>([]);
   const [orgGroups, setOrgGroups] = useState<Group[]>([]);
@@ -96,13 +99,15 @@ const FoldersTab = () => {
       fetchAllFolders();
       fetchOrgUsers();
       fetchOrgGroups();
+      fetchSharedWithMe();
     } else {
       setFolderContent(null);
       setAllFolders([]);
       setOrgUsers([]);
       setOrgGroups([]);
+      setSharedWithMe(null);
     }
-  }, [currentFolderId, currentOrganization]);
+  }, [currentFolderId, currentOrganization, currentUser]);
 
   // Close side panel when navigating folders
   useEffect(() => {
@@ -174,6 +179,21 @@ const FoldersTab = () => {
     const res = await fetch(`/api/folders?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setAllFolders(data);
+  };
+
+  const fetchSharedWithMe = async () => {
+    if (!currentUser) {
+      setSharedWithMe(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/users/${currentUser.id}/shared`, { headers: getHeaders(currentUser.id) });
+      if (res.ok) {
+        setSharedWithMe(await res.json());
+      }
+    } catch (error) {
+      console.error('Error fetching shared items:', error);
+    }
   };
 
   const fetchFolderContent = async (folderId: string | null) => {
@@ -509,6 +529,41 @@ const FoldersTab = () => {
     setMovingItem({ type: 'kahoot', id: kahoot.id, name: kahoot.name, parentId: currentFolderId });
   };
 
+  const handleKahootDuplicate = async (kahoot: Kahoot) => {
+    setError('');
+    if (currentUser) {
+      try {
+        const res = await fetch(
+          `/api/permissions/check?user=user:${currentUser.id}&relation=can_duplicate_effective&object=document:${kahoot.id}`,
+          { headers: getHeaders(currentUser.id) }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allowed) {
+            setError('Permission denied: you cannot duplicate this kahoot.');
+            return;
+          }
+        }
+      } catch { /* let backend enforce */ }
+    }
+    const res = await fetch(`/api/kahoots/${kahoot.id}/duplicate`, {
+      method: 'POST',
+      headers: getHeaders(currentUser?.id),
+    });
+    if (res.ok) {
+      const newKahoot = await res.json();
+      if (folderContent) {
+        setFolderContent({
+          ...folderContent,
+          kahoots: [...folderContent.kahoots, newKahoot],
+        });
+      }
+    } else {
+      const data = await res.json();
+      setError(data.message || 'Failed to duplicate kahoot.');
+    }
+  };
+
   const handleMoveConfirm = async (destFolderId: string) => {
     if (!movingItem) return;
     setError('');
@@ -655,6 +710,7 @@ const FoldersTab = () => {
                 onKahootDelete={handleKahootDelete}
                 onFolderMove={handleFolderMove}
                 onKahootMove={handleKahootMove}
+                onKahootDuplicate={handleKahootDuplicate}
                 selectedItemId={selectedItem?.id}
                 visibilityMode={fullVisibility ? 'show-all' : 'hide'}
                 viewableItems={viewableItems}
@@ -691,6 +747,33 @@ const FoldersTab = () => {
                 </div>
               )}
             </>
+          )}
+
+          {/* Shared with me */}
+          {currentUser && sharedWithMe && (sharedWithMe.folders.length > 0 || sharedWithMe.kahoots.length > 0) && (
+            <div className="mt-8">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Shared with me</h3>
+              <ul className="space-y-2">
+                {sharedWithMe.folders.map(folder => (
+                  <li key={`shared-folder-${folder.id}`} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <FolderIcon size={18} className="text-blue-500 flex-shrink-0" />
+                      <span className="text-sm font-medium text-gray-700">{folder.name}</span>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{folder.relation}</span>
+                  </li>
+                ))}
+                {sharedWithMe.kahoots.map(kahoot => (
+                  <li key={`shared-kahoot-${kahoot.id}`} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <FileText size={18} className="text-green-500 flex-shrink-0" />
+                      <span className="text-sm font-medium text-gray-700">{kahoot.name}</span>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">{kahoot.relation}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
 

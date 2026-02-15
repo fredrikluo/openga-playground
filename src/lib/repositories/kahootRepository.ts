@@ -14,8 +14,8 @@ export const kahootRepository = {
     return db.getAll<Kahoot>('SELECT * FROM kahoots WHERE folder_id = $1', folderId);
   },
 
-  async create(id: string, name: string, folderId: string): Promise<void> {
-    await db.run('INSERT INTO kahoots (id, name, folder_id) VALUES ($1, $2, $3)', id, name, folderId);
+  async create(id: string, name: string, folderId: string, creatorId: string | null = null): Promise<void> {
+    await db.run('INSERT INTO kahoots (id, name, folder_id, creator_id) VALUES ($1, $2, $3, $4)', id, name, folderId, creatorId);
   },
 
   async update(id: string, name: string, folderId: string): Promise<boolean> {

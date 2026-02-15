@@ -23,7 +23,7 @@ export async function addUserToOrganization(userId: string, organizationId: stri
     await userOrganizationRepository.addUserToOrg(userId, organizationId, role);
 
     const folderId = generateId();
-    await folderRepository.create(folderId, user.name, org.root_folder_id, organizationId);
+    await folderRepository.create(folderId, user.name, org.root_folder_id, organizationId, userId);
   });
 }
 

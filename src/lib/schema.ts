@@ -42,10 +42,12 @@ export interface Folder {
   name: string;
   parent_folder_id: string | null;
   organization_id: string;
+  creator_id: string | null;
 }
 
 export interface Kahoot {
   id: string;
   name: string;
   folder_id: string;
+  creator_id: string | null;
 }

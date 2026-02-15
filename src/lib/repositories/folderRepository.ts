@@ -33,8 +33,8 @@ export const folderRepository = {
     );
   },
 
-  async create(id: string, name: string, parentId: string | null, orgId: string | null): Promise<void> {
-    await db.run('INSERT INTO folders (id, name, parent_folder_id, organization_id) VALUES ($1, $2, $3, $4)', id, name, parentId, orgId);
+  async create(id: string, name: string, parentId: string | null, orgId: string | null, creatorId: string | null = null): Promise<void> {
+    await db.run('INSERT INTO folders (id, name, parent_folder_id, organization_id, creator_id) VALUES ($1, $2, $3, $4, $5)', id, name, parentId, orgId, creatorId);
   },
 
   async update(id: string, name: string, parentId: string | null): Promise<boolean> {

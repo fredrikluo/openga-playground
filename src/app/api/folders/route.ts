@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const folderId = generateId();
-    await folderRepository.create(folderId, name, parent_folder_id, orgId);
+    await folderRepository.create(folderId, name, parent_folder_id, orgId, userId);
 
     if (userId) {
       await syncFolderCreated(folderId, orgId, parent_folder_id || null, userId);

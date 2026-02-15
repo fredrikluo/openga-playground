@@ -20,8 +20,10 @@ export const SCHEMA_STATEMENTS = [
     name TEXT NOT NULL,
     parent_folder_id TEXT,
     organization_id TEXT,
+    creator_id TEXT,
     FOREIGN KEY (parent_folder_id) REFERENCES folders(id),
-    FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    FOREIGN KEY (organization_id) REFERENCES organizations(id),
+    FOREIGN KEY (creator_id) REFERENCES users(id)
   )`,
 
   `CREATE TABLE IF NOT EXISTS groups (
@@ -52,7 +54,9 @@ export const SCHEMA_STATEMENTS = [
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     folder_id TEXT NOT NULL,
-    FOREIGN KEY (folder_id) REFERENCES folders(id)
+    creator_id TEXT,
+    FOREIGN KEY (folder_id) REFERENCES folders(id),
+    FOREIGN KEY (creator_id) REFERENCES users(id)
   )`,
 
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_folder_name_per_parent

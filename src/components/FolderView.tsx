@@ -1,6 +1,6 @@
 'use client';
 
-import { Folder, FileText, ArrowLeft, Pencil, Trash2, Info, MoveRight } from 'lucide-react';
+import { Folder, FileText, ArrowLeft, Pencil, Trash2, Info, MoveRight, Copy } from 'lucide-react';
 
 interface Kahoot {
   id: string;
@@ -28,6 +28,7 @@ interface FolderViewProps {
   onKahootDelete?: (kahootId: string) => void;
   onFolderMove?: (folder: SubFolder) => void;
   onKahootMove?: (kahoot: Kahoot) => void;
+  onKahootDuplicate?: (kahoot: Kahoot) => void;
   selectedItemId?: string;
   permissions?: Record<string, boolean>;
   visibilityMode?: 'off' | 'show-all' | 'hide';
@@ -48,6 +49,7 @@ export default function FolderView({
   onKahootDelete,
   onFolderMove,
   onKahootMove,
+  onKahootDuplicate,
   selectedItemId,
   visibilityMode = 'off',
   viewableItems = {},
@@ -136,7 +138,7 @@ export default function FolderView({
             >
               <FileText size={48} className="text-green-500" />
               <span className="mt-2 text-sm font-medium text-center text-gray-700 truncate w-full">{kahoot.name}</span>
-              {onKahootDelete && (
+              {(onKahootDelete || onKahootDuplicate) && (
                 <div className="absolute top-1 right-1 flex">
                   <button
                     onClick={(e) => { e.stopPropagation(); onKahootSelect?.(kahoot); }}
@@ -145,6 +147,15 @@ export default function FolderView({
                   >
                     <Info size={14} className="text-purple-500" />
                   </button>
+                  {onKahootDuplicate && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onKahootDuplicate(kahoot); }}
+                    className="p-1 rounded-full hover:bg-gray-200"
+                    aria-label={`Duplicate ${kahoot.name}`}
+                  >
+                    <Copy size={14} className="text-gray-500" />
+                  </button>
+                  )}
                   {onKahootMove && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onKahootMove(kahoot); }}
@@ -154,6 +165,7 @@ export default function FolderView({
                     <MoveRight size={14} className="text-gray-500" />
                   </button>
                   )}
+                  {onKahootDelete && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onKahootDelete(kahoot.id); }}
                     className="p-1 rounded-full hover:bg-gray-200"
@@ -161,6 +173,7 @@ export default function FolderView({
                   >
                     <Trash2 size={14} className="text-gray-500" />
                   </button>
+                  )}
                 </div>
               )}
             </div>
@@ -222,8 +235,16 @@ export default function FolderView({
             >
               <FileText size={22} className="mr-3 text-green-500 flex-shrink-0" />
               <span className="text-base font-medium text-gray-800 flex-grow truncate">{kahoot.name}</span>
-              {(onKahootDelete || onKahootMove) && (
+              {(onKahootDelete || onKahootMove || onKahootDuplicate) && (
                 <div className="flex space-x-1 flex-shrink-0">
+                  {onKahootDuplicate && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onKahootDuplicate(kahoot); }}
+                    className="p-1.5 rounded-full hover:bg-gray-200"
+                  >
+                    <Copy size={14} />
+                  </button>
+                  )}
                   {onKahootMove && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onKahootMove(kahoot); }}

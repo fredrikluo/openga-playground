@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const kahootId = generateId();
-    await kahootRepository.create(kahootId, name, folder_id);
+    await kahootRepository.create(kahootId, name, folder_id, userId);
 
     await syncKahootCreated(kahootId, folder_id, userId || '');
 
