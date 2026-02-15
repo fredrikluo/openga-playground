@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Folder, FileText, RefreshCw } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { apiHeaders, getHeaders } from '@/lib/api';
@@ -18,6 +19,60 @@ interface User {
   organization_id: string;
 }
 
+interface SharedItem {
+  id: string;
+  name: string;
+  relation: string;
+}
+
+interface SharedItems {
+  folders: SharedItem[];
+  kahoots: SharedItem[];
+}
+
+function SharedItemsList({ items, onRefresh }: { items: SharedItems | undefined; onRefresh: () => void }) {
+  if (!items) {
+    return <p className="text-sm text-gray-400 py-2">Loading...</p>;
+  }
+
+  const { folders, kahoots } = items;
+  const hasItems = folders.length > 0 || kahoots.length > 0;
+
+  return (
+    <div>
+      <div className="flex justify-end mb-2">
+        <button onClick={onRefresh} className="p-1.5 rounded-full hover:bg-gray-100 transition" aria-label="Refresh">
+          <RefreshCw size={14} className="text-gray-500" />
+        </button>
+      </div>
+      {hasItems ? (
+        <ul className="space-y-2">
+          {folders.map(folder => (
+            <li key={`folder-${folder.id}`} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Folder size={18} className="text-blue-500 flex-shrink-0" />
+                <span className="text-sm font-medium text-gray-700">{folder.name}</span>
+              </div>
+              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{folder.relation}</span>
+            </li>
+          ))}
+          {kahoots.map(kahoot => (
+            <li key={`kahoot-${kahoot.id}`} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <FileText size={18} className="text-green-500 flex-shrink-0" />
+                <span className="text-sm font-medium text-gray-700">{kahoot.name}</span>
+              </div>
+              <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">{kahoot.relation}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-gray-400 text-center py-4">No items shared with this group</p>
+      )}
+    </div>
+  );
+}
+
 const GroupsTab = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [name, setName] = useState('');
@@ -26,6 +81,8 @@ const GroupsTab = () => {
   const [addingMemberToGroup, setAddingMemberToGroup] = useState<string | null>(null);
   const [selectedNewMemberId, setSelectedNewMemberId] = useState<string>('');
   const [pageByGroup, setPageByGroup] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState<Record<string, 'members' | 'shared'>>({});
+  const [sharedByGroup, setSharedByGroup] = useState<Record<string, SharedItems>>({});
   const { currentUser } = useUser();
   const { currentOrganization } = useOrganization();
   const [orgUsers, setOrgUsers] = useState<User[]>([]);
@@ -34,6 +91,18 @@ const GroupsTab = () => {
     const res = await fetch(`/api/groups/${groupId}`, { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setMembersByGroup(prev => ({ ...prev, [groupId]: data.users || [] }));
+  }, [currentUser]);
+
+  const fetchSharedItems = useCallback(async (groupId: string) => {
+    try {
+      const res = await fetch(`/api/groups/${groupId}/shared`, { headers: getHeaders(currentUser?.id) });
+      if (res.ok) {
+        const data: SharedItems = await res.json();
+        setSharedByGroup(prev => ({ ...prev, [groupId]: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching shared items:', error);
+    }
   }, [currentUser]);
 
   const fetchGroups = useCallback(async () => {
@@ -180,80 +249,116 @@ const GroupsTab = () => {
                       <button onClick={() => handleDelete(group.id)} className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Delete</button>
                     </div>
 
-                    {members.length > 0 && (
+                    {/* Tabs */}
+                    <div className="flex border-b border-gray-200 mb-3">
+                      <button
+                        onClick={() => setActiveTab(prev => ({ ...prev, [group.id]: 'members' }))}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          (activeTab[group.id] || 'members') === 'members'
+                            ? 'border-b-2 border-blue-600 text-blue-600'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Members
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveTab(prev => ({ ...prev, [group.id]: 'shared' }));
+                          if (!sharedByGroup[group.id]) fetchSharedItems(group.id);
+                        }}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          activeTab[group.id] === 'shared'
+                            ? 'border-b-2 border-blue-600 text-blue-600'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Shared Items
+                      </button>
+                    </div>
+
+                    {(activeTab[group.id] || 'members') === 'members' ? (
                       <>
-                        <ul className="space-y-2 mb-3">
-                          {pagedMembers.map(member => (
-                            <li key={member.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-                              <div>
-                                <p className="font-medium text-gray-700">{member.name}</p>
-                                <p className="text-sm text-gray-500">{member.email}</p>
+                        {members.length > 0 && (
+                          <>
+                            <ul className="space-y-2 mb-3">
+                              {pagedMembers.map(member => (
+                                <li key={member.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                                  <div>
+                                    <p className="font-medium text-gray-700">{member.name}</p>
+                                    <p className="text-sm text-gray-500">{member.email}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRemoveMember(group, member.id)}
+                                    className="px-3 py-1 text-sm bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 transition"
+                                  >
+                                    Remove
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                            {totalPages > 1 && (
+                              <div className="flex items-center justify-between mb-3">
+                                <button
+                                  onClick={() => setPageByGroup(prev => ({ ...prev, [group.id]: page - 1 }))}
+                                  disabled={page === 0}
+                                  className="px-3 py-1 text-sm font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                >
+                                  Previous
+                                </button>
+                                <span className="text-sm text-gray-500">Page {page + 1} of {totalPages}</span>
+                                <button
+                                  onClick={() => setPageByGroup(prev => ({ ...prev, [group.id]: page + 1 }))}
+                                  disabled={page >= totalPages - 1}
+                                  className="px-3 py-1 text-sm font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                >
+                                  Next
+                                </button>
                               </div>
-                              <button
-                                onClick={() => handleRemoveMember(group, member.id)}
-                                className="px-3 py-1 text-sm bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 transition"
-                              >
-                                Remove
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                        {totalPages > 1 && (
-                          <div className="flex items-center justify-between mb-3">
-                            <button
-                              onClick={() => setPageByGroup(prev => ({ ...prev, [group.id]: page - 1 }))}
-                              disabled={page === 0}
-                              className="px-3 py-1 text-sm font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            )}
+                          </>
+                        )}
+
+                        {addingMemberToGroup === group.id ? (
+                          <div className="flex items-center space-x-2">
+                            <select
+                              value={selectedNewMemberId}
+                              onChange={(e) => setSelectedNewMemberId(e.target.value)}
+                              className="flex-1 border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                             >
-                              Previous
+                              <option value="" disabled>Select a user</option>
+                              {availableUsers.map(user => (
+                                <option key={user.id} value={user.id}>{user.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleAddMember(group)}
+                              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+                            >
+                              Add
                             </button>
-                            <span className="text-sm text-gray-500">Page {page + 1} of {totalPages}</span>
                             <button
-                              onClick={() => setPageByGroup(prev => ({ ...prev, [group.id]: page + 1 }))}
-                              disabled={page >= totalPages - 1}
-                              className="px-3 py-1 text-sm font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed bg-gray-200 text-gray-700 hover:bg-gray-300"
+                              onClick={() => { setAddingMemberToGroup(null); setSelectedNewMemberId(''); }}
+                              className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition"
                             >
-                              Next
+                              Cancel
                             </button>
                           </div>
+                        ) : (
+                          availableUsers.length > 0 && (
+                            <button
+                              onClick={() => setAddingMemberToGroup(group.id)}
+                              className="px-4 py-2 text-sm bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
+                            >
+                              + Add Member
+                            </button>
+                          )
                         )}
                       </>
-                    )}
-
-                    {addingMemberToGroup === group.id ? (
-                      <div className="flex items-center space-x-2">
-                        <select
-                          value={selectedNewMemberId}
-                          onChange={(e) => setSelectedNewMemberId(e.target.value)}
-                          className="flex-1 border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        >
-                          <option value="" disabled>Select a user</option>
-                          {availableUsers.map(user => (
-                            <option key={user.id} value={user.id}>{user.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => handleAddMember(group)}
-                          className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-                        >
-                          Add
-                        </button>
-                        <button
-                          onClick={() => { setAddingMemberToGroup(null); setSelectedNewMemberId(''); }}
-                          className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition"
-                        >
-                          Cancel
-                        </button>
-                      </div>
                     ) : (
-                      availableUsers.length > 0 && (
-                        <button
-                          onClick={() => setAddingMemberToGroup(group.id)}
-                          className="px-4 py-2 text-sm bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
-                        >
-                          + Add Member
-                        </button>
-                      )
+                      <SharedItemsList
+                        items={sharedByGroup[group.id]}
+                        onRefresh={() => fetchSharedItems(group.id)}
+                      />
                     )}
                   </li>
                 );
