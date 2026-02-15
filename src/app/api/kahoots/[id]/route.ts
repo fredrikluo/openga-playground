@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { kahootRepository } from '@/lib/repositories';
 import { syncKahootUpdated, syncKahootDeleted } from '@/lib/openfga-tuples';
-import { check } from '@/lib/openfga';
+import { checkWithPolicy as check } from '@/lib/policy';
 import { getCurrentUserId } from '@/lib/auth';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {

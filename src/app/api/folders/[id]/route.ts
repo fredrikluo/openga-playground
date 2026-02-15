@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { folderRepository, kahootRepository } from '@/lib/repositories';
 import { syncFolderMoved, syncFolderDeletedRecursive } from '@/lib/openfga-tuples';
-import { check } from '@/lib/openfga';
+import { checkWithPolicy as check } from '@/lib/policy';
 import { getCurrentUserId } from '@/lib/auth';
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
