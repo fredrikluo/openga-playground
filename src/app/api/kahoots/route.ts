@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     await syncKahootCreated(kahootId, folder_id, userId || '');
 
-    return NextResponse.json({ id: kahootId, name, folder_id }, { status: 201 });
+    return NextResponse.json({ id: kahootId, name, folder_id, creator_id: userId }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

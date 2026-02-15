@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       await writeFolderTuples(folderId, orgId, parent_folder_id || null);
     }
 
-    return NextResponse.json({ id: folderId, name, parent_folder_id, organization_id: orgId }, { status: 201 });
+    return NextResponse.json({ id: folderId, name, parent_folder_id, organization_id: orgId, creator_id: userId }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
       return NextResponse.json({ message: 'A folder with this name already exists at this location' }, { status: 409 });

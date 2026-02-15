@@ -14,11 +14,13 @@ interface Folder {
   name: string;
   parent_folder_id: string | null;
   organization_id: string;
+  creator_id: string | null;
 }
 
 interface Kahoot {
   id: string;
   name: string;
+  creator_id?: string | null;
 }
 
 interface FolderContent {
@@ -39,7 +41,7 @@ interface Group {
   name: string;
 }
 
-type SelectedItem = { type: 'folder'; id: string; name: string } | { type: 'document'; id: string; name: string } | null;
+type SelectedItem = { type: 'folder'; id: string; name: string; creator_id?: string | null } | { type: 'document'; id: string; name: string; creator_id?: string | null } | null;
 
 const FoldersTab = () => {
   const { currentOrganization } = useOrganization();
@@ -226,14 +228,14 @@ const FoldersTab = () => {
   };
 
   const handleFolderSelect = (folder: Folder) => {
-    setSelectedItem({ type: 'folder', id: folder.id, name: folder.name });
+    setSelectedItem({ type: 'folder', id: folder.id, name: folder.name, creator_id: folder.creator_id });
   };
 
   const handleKahootSelect = (kahoot: Kahoot) => {
     setSelectedItem(prev =>
       prev?.type === 'document' && prev.id === kahoot.id
         ? null
-        : { type: 'document', id: kahoot.id, name: kahoot.name }
+        : { type: 'document', id: kahoot.id, name: kahoot.name, creator_id: kahoot.creator_id }
     );
   };
 
@@ -798,6 +800,13 @@ const FoldersTab = () => {
             </div>
 
             <p className="text-xs text-gray-400 font-mono truncate">{selectedItem.type}:{selectedItem.id}</p>
+
+            {/* Owner */}
+            <p className="text-sm text-gray-600">
+              Owner: {selectedItem.creator_id
+                ? orgUsers.find(u => u.id === selectedItem.creator_id)?.name || selectedItem.creator_id
+                : <span className="text-gray-400 italic">System</span>}
+            </p>
 
             {/* Permissions */}
             <div>
