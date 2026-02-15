@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@/context/UserContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import { apiHeaders, getHeaders } from '@/lib/api';
 
 interface Group {
@@ -25,9 +26,9 @@ const GroupsTab = () => {
   const [addingMemberToGroup, setAddingMemberToGroup] = useState<string | null>(null);
   const [selectedNewMemberId, setSelectedNewMemberId] = useState<string>('');
   const [pageByGroup, setPageByGroup] = useState<Record<string, number>>({});
-  const { currentUser, users } = useUser();
-
-  const usersInSameOrg = users.filter(u => u.organization_id === currentUser?.organization_id);
+  const { currentUser } = useUser();
+  const { currentOrganization } = useOrganization();
+  const [orgUsers, setOrgUsers] = useState<User[]>([]);
 
   const fetchGroupMembers = useCallback(async (groupId: string) => {
     const res = await fetch(`/api/groups/${groupId}`, { headers: getHeaders(currentUser?.id) });
@@ -36,8 +37,8 @@ const GroupsTab = () => {
   }, [currentUser]);
 
   const fetchGroups = useCallback(async () => {
-    if (currentUser) {
-      const res = await fetch(`/api/groups?organizationId=${currentUser.organization_id}`, { headers: getHeaders(currentUser?.id) });
+    if (currentOrganization) {
+      const res = await fetch(`/api/groups?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
       const data: Group[] = await res.json();
       setGroups(data);
       data.forEach(group => fetchGroupMembers(group.id));
@@ -45,22 +46,30 @@ const GroupsTab = () => {
       setGroups([]);
       setMembersByGroup({});
     }
-  }, [currentUser, fetchGroupMembers]);
+  }, [currentOrganization, currentUser, fetchGroupMembers]);
+
+  const fetchOrgUsers = useCallback(async () => {
+    if (!currentOrganization) return;
+    const res = await fetch(`/api/users?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
+    const data = await res.json();
+    setOrgUsers(data);
+  }, [currentOrganization, currentUser]);
 
   useEffect(() => {
     fetchGroups();
-  }, [fetchGroups]);
+    fetchOrgUsers();
+  }, [fetchGroups, fetchOrgUsers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!currentOrganization) return;
 
     await fetch('/api/groups', {
       method: 'POST',
       headers: apiHeaders(currentUser?.id),
       body: JSON.stringify({
         name,
-        organization_id: currentUser.organization_id,
+        organization_id: currentOrganization.id,
         user_ids: selectedUserIds,
       }),
     });
@@ -102,8 +111,16 @@ const GroupsTab = () => {
   const getAvailableUsers = (groupId: string) => {
     const currentMembers = membersByGroup[groupId] || [];
     const memberIds = new Set(currentMembers.map(u => u.id));
-    return usersInSameOrg.filter(u => !memberIds.has(u.id));
+    return orgUsers.filter(u => !memberIds.has(u.id));
   };
+
+  if (!currentOrganization) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500 text-lg">Please select an organization to view groups</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -127,7 +144,7 @@ const GroupsTab = () => {
                 onChange={(e) => setSelectedUserIds(Array.from(e.target.selectedOptions, option => option.value))}
                 className="w-full h-32 border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               >
-                {usersInSameOrg.map(user => (
+                {orgUsers.map(user => (
                   <option key={user.id} value={user.id}>{user.name}</option>
                 ))}
               </select>

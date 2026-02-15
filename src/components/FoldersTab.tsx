@@ -33,6 +33,11 @@ interface User {
   name: string;
 }
 
+interface Group {
+  id: string;
+  name: string;
+}
+
 type SelectedItem = { type: 'folder'; id: string; name: string } | { type: 'document'; id: string; name: string } | null;
 
 const FoldersTab = () => {
@@ -72,9 +77,12 @@ const FoldersTab = () => {
   const [fullVisibility, setFullVisibility] = useState(false);
   const [viewableItems, setViewableItems] = useState<Record<string, boolean>>({});
 
-  // Users for role assignment
+  // Users and groups for role assignment
   const [orgUsers, setOrgUsers] = useState<User[]>([]);
+  const [orgGroups, setOrgGroups] = useState<Group[]>([]);
+  const [assigneeType, setAssigneeType] = useState<'user' | 'group'>('user');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<string>('viewer');
 
   useEffect(() => {
@@ -82,10 +90,12 @@ const FoldersTab = () => {
       fetchFolderContent(currentFolderId);
       fetchAllFolders();
       fetchOrgUsers();
+      fetchOrgGroups();
     } else {
       setFolderContent(null);
       setAllFolders([]);
       setOrgUsers([]);
+      setOrgGroups([]);
     }
   }, [currentFolderId, currentOrganization]);
 
@@ -145,6 +155,13 @@ const FoldersTab = () => {
     const res = await fetch(`/api/users?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
     const data = await res.json();
     setOrgUsers(data);
+  };
+
+  const fetchOrgGroups = async () => {
+    if (!currentOrganization) return;
+    const res = await fetch(`/api/groups?organizationId=${currentOrganization.id}`, { headers: getHeaders(currentUser?.id) });
+    const data = await res.json();
+    setOrgGroups(data);
   };
 
   const fetchAllFolders = async () => {
@@ -366,9 +383,16 @@ const FoldersTab = () => {
   };
 
   const handleAssignRole = async () => {
-    if (!selectedUserId || !selectedRole || !selectedItem) return;
-    await assignRole(`user:${selectedUserId}`, selectedRole);
-    setSelectedUserId('');
+    if (!selectedRole || !selectedItem) return;
+    if (assigneeType === 'user') {
+      if (!selectedUserId) return;
+      await assignRole(`user:${selectedUserId}`, selectedRole);
+      setSelectedUserId('');
+    } else {
+      if (!selectedGroupId) return;
+      await assignRole(`group:${selectedGroupId}#member`, selectedRole);
+      setSelectedGroupId('');
+    }
   };
 
   if (!currentOrganization) {
@@ -590,16 +614,47 @@ const FoldersTab = () => {
             <div>
               <h4 className="text-sm font-semibold text-purple-700 mb-2">Assign role</h4>
               <div className="space-y-2">
-                <select
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="w-full border border-gray-300 p-2 rounded-lg text-sm"
-                >
-                  <option value="">Select User</option>
-                  {orgUsers.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => { setAssigneeType('user'); setSelectedGroupId(''); }}
+                    className={`flex-1 py-1 text-xs font-medium rounded-lg transition ${
+                      assigneeType === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    User
+                  </button>
+                  <button
+                    onClick={() => { setAssigneeType('group'); setSelectedUserId(''); }}
+                    className={`flex-1 py-1 text-xs font-medium rounded-lg transition ${
+                      assigneeType === 'group' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Group
+                  </button>
+                </div>
+                {assigneeType === 'user' ? (
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg text-sm"
+                  >
+                    <option value="">Select User</option>
+                    {orgUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={selectedGroupId}
+                    onChange={(e) => setSelectedGroupId(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg text-sm"
+                  >
+                    <option value="">Select Group</option>
+                    {orgGroups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                )}
                 <div className="flex gap-2">
                   <select
                     value={selectedRole}
@@ -613,7 +668,7 @@ const FoldersTab = () => {
                   </select>
                   <button
                     onClick={handleAssignRole}
-                    disabled={!selectedUserId}
+                    disabled={assigneeType === 'user' ? !selectedUserId : !selectedGroupId}
                     className="px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition disabled:opacity-50 text-sm"
                   >
                     Assign
