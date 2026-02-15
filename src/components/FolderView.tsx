@@ -12,6 +12,7 @@ interface SubFolder {
   name: string;
   parent_folder_id: string | null;
   organization_id: string;
+  creator_id: string | null;
 }
 
 interface FolderViewProps {
@@ -54,7 +55,6 @@ export default function FolderView({
   visibilityMode = 'off',
   viewableItems = {},
 }: FolderViewProps) {
-  const isVisible = (id: string) => visibilityMode === 'off' || viewableItems[id] !== false;
   const isDimmed = (id: string) => visibilityMode === 'show-all' && viewableItems[id] === false;
 
   const visibleFolders = visibilityMode === 'hide'
