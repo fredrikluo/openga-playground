@@ -7,7 +7,7 @@ dev: ## Start development environment with hot reload
 	$(DEV) up
 
 prod: ## Start production environment
-	$(PROD) up --build
+	$(PROD) up --build -d
 
 setup: ## Upload OpenFGA authorization model via API
 	./setup-openfga.sh

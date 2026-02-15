@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=openfga
       - POSTGRES_PASSWORD=openfga
@@ -30,6 +31,7 @@ services:
 
   openfga:
     image: openfga/openfga:latest
+    restart: unless-stopped
     environment:
       - OPENFGA_DATASTORE_ENGINE=postgres
       - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable
