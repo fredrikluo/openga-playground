@@ -4,7 +4,7 @@ PROD = docker compose -f docker-compose.yml -f docker-compose.prod.yml
 .PHONY: dev prod setup generate-model down clean logs
 
 dev: ## Start development environment with hot reload
-	$(DEV) up
+	$(DEV) up --build
 
 prod: ## Start production environment
 	$(PROD) up --build -d

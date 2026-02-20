@@ -23,6 +23,7 @@ interface SharedItem {
   id: string;
   name: string;
   relation: string;
+  owner: string | null;
 }
 
 interface SharedItems {
@@ -49,20 +50,22 @@ function SharedItemsList({ items, onRefresh }: { items: SharedItems | undefined;
         <ul className="space-y-2">
           {folders.map(folder => (
             <li key={`folder-${folder.id}`} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <Folder size={18} className="text-blue-500 flex-shrink-0" />
-                <span className="text-sm font-medium text-gray-700">{folder.name}</span>
+                <span className="text-sm font-medium text-gray-700 truncate">{folder.name}</span>
+                {folder.owner && <span className="text-xs text-gray-400 flex-shrink-0">by {folder.owner}</span>}
               </div>
-              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{folder.relation}</span>
+              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full flex-shrink-0">{folder.relation}</span>
             </li>
           ))}
           {kahoots.map(kahoot => (
             <li key={`kahoot-${kahoot.id}`} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <FileText size={18} className="text-green-500 flex-shrink-0" />
-                <span className="text-sm font-medium text-gray-700">{kahoot.name}</span>
+                <span className="text-sm font-medium text-gray-700 truncate">{kahoot.name}</span>
+                {kahoot.owner && <span className="text-xs text-gray-400 flex-shrink-0">by {kahoot.owner}</span>}
               </div>
-              <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">{kahoot.relation}</span>
+              <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full flex-shrink-0">{kahoot.relation}</span>
             </li>
           ))}
         </ul>

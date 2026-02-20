@@ -85,7 +85,8 @@ const FoldersTab = () => {
   const [rootFolderId, setRootFolderId] = useState<string>('');
 
   // Shared with me
-  const [sharedWithMe, setSharedWithMe] = useState<{ folders: { id: string; name: string; relation: string }[]; kahoots: { id: string; name: string; relation: string }[] } | null>(null);
+  const [sharedWithMe, setSharedWithMe] = useState<{ folders: { id: string; name: string; relation: string; owner: string | null; orgName?: string }[]; kahoots: { id: string; name: string; relation: string; owner: string | null; orgName?: string }[] } | null>(null);
+  const [showAllShared, setShowAllShared] = useState(false);
 
   // Users and groups for role assignment
   const [orgUsers, setOrgUsers] = useState<User[]>([]);
@@ -183,13 +184,14 @@ const FoldersTab = () => {
     setAllFolders(data);
   };
 
-  const fetchSharedWithMe = async () => {
+  const fetchSharedWithMe = async (allOrgs?: boolean) => {
     if (!currentUser) {
       setSharedWithMe(null);
       return;
     }
     try {
-      const res = await fetch(`/api/users/${currentUser.id}/shared`, { headers: getHeaders(currentUser.id) });
+      const orgParam = !allOrgs && currentOrganization ? `?organizationId=${currentOrganization.id}` : '';
+      const res = await fetch(`/api/users/${currentUser.id}/shared${orgParam}`, { headers: getHeaders(currentUser.id) });
       if (res.ok) {
         setSharedWithMe(await res.json());
       }
@@ -752,26 +754,46 @@ const FoldersTab = () => {
           )}
 
           {/* Shared with me */}
-          {currentUser && sharedWithMe && (sharedWithMe.folders.length > 0 || sharedWithMe.kahoots.length > 0) && (
+          {currentUser && sharedWithMe && (sharedWithMe.folders.length > 0 || sharedWithMe.kahoots.length > 0 || showAllShared) && (
             <div className="mt-8">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Shared with me</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-800">Shared with me</h3>
+                <button
+                  onClick={() => {
+                    const next = !showAllShared;
+                    setShowAllShared(next);
+                    fetchSharedWithMe(next);
+                  }}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition ${
+                    showAllShared
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {showAllShared ? 'All orgs' : 'This org'}
+                </button>
+              </div>
               <ul className="space-y-2">
                 {sharedWithMe.folders.map(folder => (
                   <li key={`shared-folder-${folder.id}`} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <FolderIcon size={18} className="text-blue-500 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-700">{folder.name}</span>
+                      <span className="text-sm font-medium text-gray-700 truncate">{folder.name}</span>
+                      {folder.owner && <span className="text-xs text-gray-400 flex-shrink-0">by {folder.owner}</span>}
+                      {folder.orgName && <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded flex-shrink-0">{folder.orgName}</span>}
                     </div>
-                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{folder.relation}</span>
+                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full flex-shrink-0">{folder.relation}</span>
                   </li>
                 ))}
                 {sharedWithMe.kahoots.map(kahoot => (
                   <li key={`shared-kahoot-${kahoot.id}`} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <FileText size={18} className="text-green-500 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-700">{kahoot.name}</span>
+                      <span className="text-sm font-medium text-gray-700 truncate">{kahoot.name}</span>
+                      {kahoot.owner && <span className="text-xs text-gray-400 flex-shrink-0">by {kahoot.owner}</span>}
+                      {kahoot.orgName && <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded flex-shrink-0">{kahoot.orgName}</span>}
                     </div>
-                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">{kahoot.relation}</span>
+                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full flex-shrink-0">{kahoot.relation}</span>
                   </li>
                 ))}
               </ul>
