@@ -30,10 +30,14 @@ type folder
     define creator: [user, group#member, organization#member]  # NOT inherited
     define viewer:  [user, group#member, organization#member]
 
+    # Public access (bypasses org membership gating)
+    define public_viewer: [user:*]
+
     # Inherited roles (creator is intentionally NOT inherited)
     define manager_inherited: manager or manager_inherited from parent
     define editor_inherited:  editor  or editor_inherited from parent
     define viewer_inherited:  viewer  or viewer_inherited from parent
+    define public_viewer_inherited: public_viewer or public_viewer_inherited from parent
 
     # --- Permissions to match your table ---
 
@@ -53,8 +57,8 @@ type folder
     define can_set_visibility: manager_inherited
     define can_lock: manager_inherited
 
-    # Effective permissions: must also be an org member
-    define can_view_effective:           can_view           and member from in_org
+    # Effective permissions: must also be an org member (or public viewer for view)
+    define can_view_effective:           (can_view and member from in_org) or public_viewer_inherited
     define can_create_effective:         can_create         and member from in_org
     define can_edit_effective:           can_edit           and member from in_org
     define can_duplicate_effective:      can_duplicate      and member from in_org
@@ -75,6 +79,9 @@ type document
     define editor:  [user, group#member]
     define creator: [user, group#member, organization#member]  # NOT inherited
     define viewer:  [user, group#member, organization#member]
+
+    # Public access (inherited from parent folder)
+    define public_viewer: [user:*] or public_viewer from parent
 
     # Direct share to a specific user
     define shared_with: [user]
@@ -103,8 +110,8 @@ type document
     define can_set_visibility: manager_inherited
     define can_lock: manager_inherited
 
-    # Effective permissions: must also be an org member
-    define can_view_effective:           can_view           and member from in_org
+    # Effective permissions: must also be an org member (or public viewer for view)
+    define can_view_effective:           (can_view and member from in_org) or public_viewer
     define can_create_effective:         can_create         and member from in_org
     define can_edit_effective:           can_edit           and member from in_org
     define can_duplicate_effective:      can_duplicate      and member from in_org

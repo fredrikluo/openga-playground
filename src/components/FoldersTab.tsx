@@ -6,6 +6,7 @@ import FolderPickerModal from './FolderPickerModal';
 import { List, Grid, X, Folder as FolderIcon, FileText, Eye, EyeOff } from 'lucide-react';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useUser } from '@/context/UserContext';
+import { useError } from '@/context/ErrorContext';
 import { apiHeaders, getHeaders } from '@/lib/api';
 import { usePermissions, useRoleAssignments } from '@/hooks/usePermissions';
 
@@ -52,7 +53,7 @@ const FoldersTab = () => {
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
-  const [error, setError] = useState<string>('');
+  const { setError } = useError();
 
   // Side panel selection
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
@@ -615,12 +616,6 @@ const FoldersTab = () => {
         <h2 className="text-2xl font-bold text-gray-800 mb-4">
           {editingFolder ? 'Edit Folder' : 'Add a New Folder'}
         </h2>
-        {error && (
-          <div className="flex items-center justify-between p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">
-            <span>{error}</span>
-            <button onClick={() => setError('')} className="ml-2 text-red-500 hover:text-red-700 font-bold text-lg leading-none">&times;</button>
-          </div>
-        )}
         {!canCreateInCurrentFolder && !editingFolder && (
           <div className="p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg mb-4 text-sm">
             You do not have permission to create folders here.

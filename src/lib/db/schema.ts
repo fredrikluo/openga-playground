@@ -62,3 +62,16 @@ export const SCHEMA_STATEMENTS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_folder_name_per_parent
    ON folders(name, COALESCE(parent_folder_id, ''), COALESCE(organization_id, ''))`,
 ];
+
+// Migrations run after table creation. Each has a unique key and an idempotent SQL statement.
+// New migrations should be appended to the end — never modify or remove existing ones.
+export const MIGRATIONS: { key: string; sql: string }[] = [
+  {
+    key: '001_add_creator_id_to_folders',
+    sql: `ALTER TABLE folders ADD COLUMN IF NOT EXISTS creator_id TEXT REFERENCES users(id)`,
+  },
+  {
+    key: '002_add_creator_id_to_kahoots',
+    sql: `ALTER TABLE kahoots ADD COLUMN IF NOT EXISTS creator_id TEXT REFERENCES users(id)`,
+  },
+];

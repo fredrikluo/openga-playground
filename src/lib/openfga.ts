@@ -7,26 +7,24 @@ let fgaClient: OpenFgaClient | null = null;
 let initialized = false;
 
 /**
- * Ensure the store has an authorization model. Uploads one if none exists.
+ * Ensure the store has the latest authorization model.
+ * Always uploads — OpenFGA supports versioned models and uses the latest.
  */
 async function ensureModel(client: OpenFgaClient): Promise<void> {
   try {
-    const modelResp = await client.readLatestAuthorizationModel();
-    if (modelResp.authorization_model?.id) {
-      client.authorizationModelId = modelResp.authorization_model.id;
-      return;
-    }
-  } catch {
-    // No model found — upload one
-  }
-
-  try {
-    console.log('OpenFGA: Uploading authorization model...');
     const resp = await client.writeAuthorizationModel(AUTHORIZATION_MODEL);
     client.authorizationModelId = resp.authorization_model_id;
     console.log(`OpenFGA: Model uploaded (${resp.authorization_model_id})`);
   } catch (error) {
-    console.error('OpenFGA: Failed to upload authorization model:', error);
+    // Upload failed (possibly identical model) — fall back to existing
+    try {
+      const modelResp = await client.readLatestAuthorizationModel();
+      if (modelResp.authorization_model?.id) {
+        client.authorizationModelId = modelResp.authorization_model.id;
+      }
+    } catch {
+      console.error('OpenFGA: Failed to load authorization model:', error);
+    }
   }
 }
 
@@ -91,6 +89,12 @@ export async function writeTuples(tuples: TupleKey[]): Promise<void> {
   }
 }
 
+export async function writeTuplesStrict(tuples: TupleKey[]): Promise<void> {
+  if (tuples.length === 0) return;
+  const client = await getClient();
+  await client.writeTuples(tuples);
+}
+
 export async function deleteTuples(tuples: TupleKeyWithoutCondition[]): Promise<void> {
   if (tuples.length === 0) return;
   try {
@@ -99,6 +103,12 @@ export async function deleteTuples(tuples: TupleKeyWithoutCondition[]): Promise<
   } catch (error) {
     console.error('OpenFGA deleteTuples error:', error);
   }
+}
+
+export async function deleteTuplesStrict(tuples: TupleKeyWithoutCondition[]): Promise<void> {
+  if (tuples.length === 0) return;
+  const client = await getClient();
+  await client.deleteTuples(tuples);
 }
 
 export async function check(

@@ -1,6 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import type { Database } from './types';
-import { SCHEMA_STATEMENTS } from './schema';
+import { SCHEMA_STATEMENTS, MIGRATIONS } from './schema';
 
 function createDbFromClient(client: PoolClient): Database {
   return {
@@ -32,6 +32,23 @@ function createDbFromClient(client: PoolClient): Database {
 async function initSchema(pool: Pool) {
   for (const stmt of SCHEMA_STATEMENTS) {
     await pool.query(stmt);
+  }
+  await runMigrations(pool);
+}
+
+async function runMigrations(pool: Pool) {
+  await pool.query(`CREATE TABLE IF NOT EXISTS _migrations (
+    key TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+
+  for (const migration of MIGRATIONS) {
+    const existing = await pool.query('SELECT 1 FROM _migrations WHERE key = $1', [migration.key]);
+    if (existing.rowCount === 0) {
+      console.log(`Running migration: ${migration.key}`);
+      await pool.query(migration.sql);
+      await pool.query('INSERT INTO _migrations (key) VALUES ($1)', [migration.key]);
+    }
   }
 }
 

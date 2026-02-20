@@ -61,6 +61,13 @@ export const folderRepository = {
     );
   },
 
+  async getPublicFolder(rootFolderId: string, orgId: string): Promise<Folder | undefined> {
+    return db.getOne<Folder>(
+      "SELECT * FROM folders WHERE parent_folder_id = $1 AND organization_id = $2 AND name LIKE '%Public'",
+      rootFolderId, orgId
+    );
+  },
+
   async deleteFolderRecursive(folderId: string): Promise<void> {
     const subfolderIds = await folderRepository.getSubfolderIds(folderId);
     for (const subId of subfolderIds) {

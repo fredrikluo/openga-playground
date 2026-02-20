@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useError } from '@/context/ErrorContext';
 import { apiHeaders, getHeaders } from '@/lib/api';
 
 interface Organization {
@@ -21,6 +22,7 @@ interface User {
 const OrganizationsTab = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [usersByOrg, setUsersByOrg] = useState<Record<string, User[]>>({});
+  const { setError } = useError();
   const [editingOrgId, setEditingOrgId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const { currentUser, refetchUsers } = useUser();
@@ -33,6 +35,7 @@ const OrganizationsTab = () => {
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
   const [selectedOrgToJoin, setSelectedOrgToJoin] = useState<string>('');
+  const [publicFolderStatus, setPublicFolderStatus] = useState<Record<string, boolean>>({});
 
   const fetchAllUsers = async () => {
     const res = await fetch('/api/users', { headers: getHeaders(currentUser?.id) });
@@ -65,11 +68,43 @@ const OrganizationsTab = () => {
     }
   }, [currentUser, fetchOrgUsers]);
 
+  const fetchPublicFolderStatus = async (orgId: string) => {
+    try {
+      const res = await fetch(`/api/organizations/${orgId}/public-folder`, { headers: getHeaders(currentUser?.id) });
+      if (res.ok) {
+        const data = await res.json();
+        setPublicFolderStatus(prev => ({ ...prev, [orgId]: data.enabled }));
+      }
+    } catch { /* ignore */ }
+  };
+
+  const togglePublicFolder = async (orgId: string, enabled: boolean) => {
+    setError('');
+    try {
+      const res = await fetch(`/api/organizations/${orgId}/public-folder`, {
+        method: enabled ? 'POST' : 'DELETE',
+        headers: getHeaders(currentUser?.id),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPublicFolderStatus(prev => ({ ...prev, [orgId]: data.enabled }));
+      } else {
+        setError(data.message || 'Failed to toggle public folder');
+      }
+    } catch (err) {
+      setError('Failed to toggle public folder');
+    }
+  };
+
   useEffect(() => {
     fetchOrganizations();
     fetchAllUsers();
     fetchAllOrganizations();
   }, [fetchOrganizations]);
+
+  useEffect(() => {
+    organizations.forEach(org => fetchPublicFolderStatus(org.id));
+  }, [organizations]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,6 +348,20 @@ const OrganizationsTab = () => {
                           <button onClick={() => handleDelete(org.id)} className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">Delete</button>
                         </div>
                       )}
+                    </div>
+
+                    {/* Public folder toggle */}
+                    <div className="mb-3">
+                      <button
+                        onClick={() => togglePublicFolder(org.id, !publicFolderStatus[org.id])}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
+                          publicFolderStatus[org.id]
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {publicFolderStatus[org.id] ? 'Public folder: Enabled' : 'Enable public folder'}
+                      </button>
                     </div>
 
                     {members.length > 0 && (

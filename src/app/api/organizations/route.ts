@@ -35,12 +35,14 @@ export async function POST(request: Request) {
     const orgId = generateId();
     const hiddenRootId = generateId();
     const sharedFolderId = generateId();
+    const publicFolderId = generateId();
 
     const newOrg = await db.transaction(async () => {
       await folderRepository.create(hiddenRootId, `${name} Root`, null, null);
       await organizationRepository.create(orgId, name, hiddenRootId);
       await folderRepository.setOrganization(hiddenRootId, orgId);
       await folderRepository.create(sharedFolderId, `${name} Shared Folder`, hiddenRootId, orgId);
+      await folderRepository.create(publicFolderId, `${name} Public`, hiddenRootId, orgId);
 
       return { id: orgId, name, root_folder_id: hiddenRootId };
     });

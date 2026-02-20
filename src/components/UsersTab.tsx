@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
+import { useError } from '@/context/ErrorContext';
 import { apiHeaders, getHeaders } from '@/lib/api';
 
 interface User {
@@ -16,7 +17,7 @@ const UsersTab = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { setError } = useError();
 
   useEffect(() => {
     fetchUsers();
@@ -30,7 +31,7 @@ const UsersTab = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setError('');
     let res: Response;
     if (editingUser) {
       res = await fetch(`/api/users/${editingUser.id}`, {
@@ -81,11 +82,6 @@ const UsersTab = () => {
       <div>
         <h2 className="text-2xl font-bold text-gray-800 mb-4">{editingUser ? 'Edit User' : 'Add a New User'}</h2>
         <form onSubmit={handleSubmit} className="p-4 bg-gray-50 rounded-lg shadow-sm space-y-4">
-          {error && (
-            <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
-              {error}
-            </div>
-          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="text"
